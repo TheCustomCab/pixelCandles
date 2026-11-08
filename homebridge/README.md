@@ -61,7 +61,7 @@ The settings screen covers everything below. Minimal `config.json` entry:
 | `fadeInSeconds` | 10 | Fade when turning on (0–65) |
 | `fadeOutSeconds` | 5 | Fade when turning off (0–65) |
 | `brightnessTransitionSeconds` | 0.5 | Transition for brightness changes |
-| `slots` | `[1,2,3,4,5]` | Preset numbers offered as looks |
+| `slots` | `[1,2,3,4,5]` | Preset numbers offered as looks (config.json only, not in the settings screen) |
 | `slotTurnsOn` | true | Choosing a look also turns the candles on |
 | `lookControl` | `combined` | `combined`: one tile with the dimmer and the look list. `picker`: the look list as its own tile. `switches`: one switch per look in the tile (the Home app shows them unlabelled there). `both`: picker and switches |
 | `lookListAlwaysOn` | false | Keep the look list usable while the candles are off. The Home app then shows the tile as On even while the candles are off |

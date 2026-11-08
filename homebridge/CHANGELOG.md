@@ -1,6 +1,11 @@
 # Changelog
 
-## 0.1.0 (unreleased)
+## 0.1.1 (2026-11-07)
+
+- Settings screen simplified so it opens in HOOBS (it showed a blank page): no grouped sections; the look slot
+  numbers (`slots`) are set in config.json only.
+
+## 0.1.0 (2026-11-07)
 
 First release.
 

@@ -1,5 +1,5 @@
 # Build tree and caches
-WLED/
+/firmware/WLED/
 .pio/
 .DS_Store
 test/traces.csv

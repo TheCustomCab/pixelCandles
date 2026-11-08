@@ -1,7 +1,7 @@
 # Revision 2 — Custom HomeKit Plugin (planning notes)
 
-Status: **Phase 1 (MVP) built**: `homebridge-wled-candles` in `homebridge/`. Design approved 2026-11-07:
-[homebridge-design.md](homebridge-design.md); testing, HOOBS install options and cutover: [homebridge-testing.md](homebridge-testing.md). Revision 1 uses the existing **Simpler WLED** plugin (`homebridge-simpler-wled`) on HOOBS.
+Status (2026-11-07): **`homebridge-wled-candles` released on npm and running on HOOBS**; it replaced Simpler WLED. Design approved 2026-11-07:
+[homebridge-design.md](homebridge-design.md); testing, HOOBS install options and cutover: [homebridge-testing.md](homebridge-testing.md). Revision 1 used the existing **Simpler WLED** plugin (`homebridge-simpler-wled`) on HOOBS.
 This document records the options considered, what Revision 1 does not cover, and an assessment of building
 our own plugin, published only as far as **Level 1: listed and installable**.
 
