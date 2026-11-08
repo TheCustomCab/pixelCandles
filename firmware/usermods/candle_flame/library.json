@@ -1,0 +1,5 @@
+{
+  "name": "candle_flame",
+  "license": "EUPL-1.2",
+  "build": { "libArchive": false }
+}

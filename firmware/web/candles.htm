@@ -1,0 +1,1577 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: EUPL-1.2 -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#141413">
+<title>Candles</title>
+<!-- Candles control page for pixelCandles (WLED 16 + candle_flame).
+     Served from WLED's filesystem as /candles.htm. Design basis: the FORDITE bench console.
+     Talks to WLED over its WebSocket (/ws) and JSON API; no external resources.
+     Dev: open locally with ?host=<controller-ip>. -->
+<style>
+:root{
+  --bg:#141413; --surface:#1e1e1c; --surface2:#282826; --line:#3a3a37;
+  --text:#e8e6e0; --muted:#9a978f; --dim:#6e6b64;
+  --accent:#F2A93B; --accent-bg:#6B4310; --accent-text:#FFD9A0;
+  --on:#2BD94F;      --on-bg:#0B6B1E;      --on-text:#8CF0A2;
+  --warn:#FF9500;    --warn-bg:#8A4A00;    --warn-text:#FFC169;
+  --danger:#FF3B30;  --danger-bg:#8E1C16;  --danger-text:#FF9A94;
+  --r:8px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+[hidden]{display:none!important}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
+  font:15px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;overscroll-behavior:none}
+body{padding-top:env(safe-area-inset-top,0);padding-bottom:env(safe-area-inset-bottom,0)}
+html,body{overflow:hidden}
+body{display:flex;flex-direction:column}
+/* A console, not a document: dragging never selects text. */
+body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+input[type=text],input[type=number]{-webkit-user-select:text;user-select:text}
+*{scrollbar-width:none}
+::-webkit-scrollbar{display:none}
+
+#hdr{display:flex;align-items:center;gap:12px;padding:11px 14px 9px;flex:none;
+  background:linear-gradient(180deg,#191917 0%,var(--bg) 100%);border-bottom:1px solid var(--line)}
+.mark{display:flex;align-items:baseline;gap:10px;min-width:0}
+.wordmark{font-size:19px;font-weight:600;letter-spacing:.16em;white-space:nowrap;
+  background:linear-gradient(95deg,#FFE3A3 0%,#F2A93B 40%,#E0743A 75%,#C9A961 100%);
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+.mark .divider{width:1px;height:15px;background:var(--line);flex:none}
+.sub{font-size:12px;letter-spacing:.09em;color:var(--muted);white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.badge{margin-left:auto;font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--dim);border:1px solid var(--line);border-radius:20px;padding:2px 9px;flex:none}
+.badge.on{color:var(--accent-text);border-color:var(--accent)}
+.badge.bad{color:var(--danger-text);border-color:var(--danger)}
+.conn{display:flex;align-items:center;font-family:ui-monospace,monospace;font-size:10px;
+  color:var(--muted);letter-spacing:.06em;white-space:nowrap;flex:none}
+.conn i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;background:var(--dim)}
+.conn.ok i{background:var(--on);box-shadow:0 0 6px var(--on)}
+.conn.bad i{background:var(--danger);box-shadow:0 0 6px var(--danger)}
+.rev{font-family:ui-monospace,monospace;font-size:10px;color:var(--dim);white-space:nowrap;flex:none}
+.wledbtn{flex:none;font-size:11px;letter-spacing:.08em;color:var(--text);text-decoration:none;border:1px solid var(--line);
+  background:var(--surface2);border-radius:20px;padding:5px 11px;white-space:nowrap}
+.wledbtn:active{transform:scale(.97)}
+
+#tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);background:var(--surface);flex:none}
+#tabs button{flex:1;background:none;border:none;color:var(--muted);font-family:inherit;
+  padding:14px 6px;font-size:14px;border-bottom:2px solid transparent;cursor:pointer}
+#tabs button.on{color:var(--accent);border-bottom-color:var(--accent)}
+#tabs button.gear{flex:0 0 52px;display:flex;align-items:center;justify-content:center}
+.alertbar{display:none;flex:none;background:var(--danger-bg);color:var(--danger-text);
+  font-size:13px;padding:8px 14px;border-bottom:1px solid var(--danger)}
+.alertbar.show{display:block}
+
+main{padding:12px;flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  overscroll-behavior:contain}
+.wrap{max-width:780px;margin:0 auto}
+body.offline main .wrap{opacity:.45;pointer-events:none}
+.pane{display:none}.pane.on{display:block}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px}
+.card h3{margin:0 0 10px;font-size:13px;font-weight:500;color:var(--muted);display:flex;
+  align-items:center;gap:8px}
+.card h3 .right{margin-left:auto}
+.grid{display:grid;gap:8px;align-items:stretch}
+.g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:1fr 1fr 1fr}
+.looks{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}
+.looks.editing{grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}
+
+button.ctl{background:var(--surface2);border:1px solid var(--line);color:var(--text);
+  border-radius:var(--r);padding:0 8px;font-size:14px;font-family:inherit;cursor:pointer;
+  min-height:46px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:1px;line-height:1.25;text-align:center}
+button.ctl:active{transform:scale(.97)}
+a.ctl{color:var(--text);text-decoration:none}
+button.ctl.on{background:var(--accent-bg);border-color:var(--accent);color:var(--accent-text);
+  box-shadow:0 0 0 1px var(--accent) inset}
+button.ctl.dangeron{background:var(--danger-bg);border-color:var(--danger);color:var(--danger-text)}
+button.ctl.small{min-height:34px;font-size:12px;padding:0 10px;flex-direction:row}
+button.ctl[disabled]{opacity:.4;pointer-events:none}
+.bsub{font-size:10px;color:var(--dim);font-weight:400}
+button.ctl.on .bsub{color:var(--accent-text);opacity:.7}
+.seg{display:flex}.seg button{flex:1;border-radius:0;border-right-width:0}
+.seg button:first-child{border-radius:var(--r) 0 0 var(--r)}
+.seg button:last-child{border-radius:0 var(--r) var(--r) 0;border-right-width:1px}
+
+.row{display:grid;grid-template-columns:minmax(0,1fr) 2fr 56px;gap:8px;align-items:center;margin-bottom:6px}
+.row label{font-size:13px;color:var(--text)}
+.row label small{display:block;font-size:11px;color:var(--dim)}
+.row .val{font-size:13px;text-align:right;color:var(--muted);font-family:ui-monospace,monospace}
+input[type=range]{width:100%;height:30px;background:none;-webkit-appearance:none;appearance:none;margin:0}
+input[type=range]::-webkit-slider-runnable-track{height:5px;background:var(--surface2);border-radius:3px}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:26px;height:26px;
+  border-radius:50%;background:var(--accent);margin-top:-11px}
+input[type=range]::-moz-range-track{height:5px;background:var(--surface2);border-radius:3px}
+input[type=range]::-moz-range-thumb{width:26px;height:26px;border:none;border-radius:50%;background:var(--accent)}
+input[type=text],input[type=number],select{background:var(--surface2);border:1px solid var(--line);
+  color:var(--text);border-radius:var(--r);padding:8px;font-size:14px;width:100%;font-family:inherit}
+
+.kv{display:grid;grid-template-columns:1fr auto;gap:4px 10px;font-size:13px}
+.kv .k{color:var(--muted)}.kv .v{font-family:ui-monospace,monospace;text-align:right}
+.hint{font-size:11px;color:var(--dim);margin:8px 0 0}
+.rule{background:var(--accent-bg);color:var(--accent-text);border-radius:var(--r);
+  padding:9px 11px;font-size:13px;line-height:1.5;margin-bottom:10px;display:flex;align-items:center;gap:10px}
+.rule .grow{flex:1}
+.empty{color:var(--muted);font-size:13px;padding:6px 2px 2px;line-height:1.5}
+.lookedit{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;align-items:center;
+  background:var(--surface2);border:1px solid var(--line);border-radius:var(--r);padding:6px}
+.lookedit input{padding:6px 8px;font-size:14px}
+.lookedit .bsub{grid-column:1/-1;padding-left:2px}
+.editbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--surface2);
+  border:1px solid var(--line);border-radius:var(--r);padding:8px 10px;margin-top:10px}
+.editbar .lk{font-size:13px;flex:1;min-width:140px}
+.editbar .lk b{font-weight:600}
+.editbar .st{display:block;font-size:11px;color:var(--dim)}
+.editbar.changed{border-color:var(--warn);background:var(--warn-bg)}
+.editbar.changed .st{color:var(--warn-text)}
+.card>.editbar:first-child{margin-top:0}
+.pal-sub{font-size:11px;color:var(--dim);letter-spacing:.06em;text-transform:uppercase;margin:12px 0 6px}
+
+/* Power + master brightness */
+.master{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center}
+#power{width:78px;height:78px;border-radius:50%;font-size:12px;letter-spacing:.08em}
+#power svg{margin-bottom:2px}
+
+/* Live candles: one glowing dot per LED, each string on its own line */
+.live{background:#0f0f0e;border:1px solid #2a2a27;border-radius:10px;padding:12px 12px 10px;
+  box-shadow:inset 0 1px 9px rgba(0,0,0,.7);margin-bottom:10px}
+.lrow{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.lrow:last-child{margin-bottom:0}
+.lrow .lab{font-family:ui-monospace,monospace;font-size:10px;color:var(--dim);width:14px;flex:none}
+.dots{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:1px;flex:1;min-width:0;justify-items:center;align-items:center}
+.dot{width:min(12px,100%);aspect-ratio:1;border-radius:50%;background:#1c1c1a;box-shadow:inset 0 0 0 1px #000}
+.dots.dense .dot{width:min(8px,100%)}
+.livecap{font-size:10px;color:var(--dim);letter-spacing:.06em;text-transform:uppercase;margin-top:8px;
+  display:flex;justify-content:space-between}
+
+/* Palettes */
+.pal{display:grid;grid-template-columns:minmax(0,1fr) 2fr;gap:10px;align-items:center;width:100%;
+  background:var(--surface2);border:1px solid var(--line);border-radius:var(--r);padding:8px 10px;
+  margin-bottom:6px;color:var(--text);font:inherit;font-size:13px;cursor:pointer;text-align:left}
+.pal.on{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+.pal .bar{height:14px;border-radius:4px;background:#333}
+.palrow{display:grid;grid-template-columns:1fr auto;gap:6px;align-items:stretch;margin-bottom:6px}
+.palrow .pal{margin:0}
+.palrow .pedit{min-height:0;padding:0 12px;font-size:12px}
+.pe{background:#171716;border:1px solid var(--accent);border-radius:10px;padding:10px;margin:-2px 0 8px}
+.pe .pname{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:center;margin-bottom:10px}
+.pe .pname label{font-size:13px;color:var(--muted)}
+.pe .pbar{height:22px;border-radius:6px;margin-bottom:4px}
+.pe .cap{font-size:10px;color:var(--dim);letter-spacing:.06em;text-transform:uppercase;display:flex;justify-content:space-between;margin-bottom:10px}
+.stop{display:grid;grid-template-columns:44px minmax(0,1fr) 40px 34px;gap:8px;align-items:center;margin-bottom:6px}
+.stop input[type=color]{width:44px;height:34px;padding:0;border:1px solid var(--line);border-radius:var(--r);background:none;cursor:pointer}
+.stop .pos{font-family:ui-monospace,monospace;font-size:12px;color:var(--muted);text-align:right}
+.stop button{min-height:34px;padding:0}
+.pe .acts{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+.pe .acts .grow{flex:1}
+.pst{font-size:12px;color:var(--dim);align-self:center}
+.pst.saved{color:var(--on-text)}
+.pst.failed{color:var(--danger-text)}
+.slots{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-top:10px}
+.slot{background:var(--surface2);border:1px solid var(--line);border-radius:var(--r);padding:8px;display:flex;flex-direction:column;gap:6px}
+.slot .sn{font-size:11px;color:var(--dim)}
+.slot .bar{height:12px;border-radius:4px}
+.slot select{padding:6px;font-size:12px}
+
+/* HomeKit slots (presets 1-5) */
+.hk{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;
+  background:var(--surface2);border:1px solid var(--line);border-radius:var(--r);padding:6px 8px 6px 6px;margin-bottom:6px}
+.hk.on{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+.hk .show{display:grid;grid-template-columns:32px minmax(0,1fr);gap:10px;align-items:center;background:none;border:none;
+  color:var(--text);font:inherit;text-align:left;cursor:pointer;padding:2px;min-height:40px;min-width:0}
+.hk .num{width:30px;height:30px;border-radius:50%;border:1px solid var(--line);display:flex;align-items:center;
+  justify-content:center;font-family:ui-monospace,monospace;font-size:13px;color:var(--muted)}
+.hk.on .num{border-color:var(--accent);color:var(--accent-text)}
+.hk .nm{font-size:14px;font-weight:600;min-width:0}
+.hk .src{display:block;font-size:11px;color:var(--dim);font-weight:400;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hk .src.warn{color:var(--warn-text)}
+.hk .acts{display:flex;gap:6px;align-items:center}
+.hk .acts select{width:auto;max-width:160px;min-height:34px;padding:0 8px;font-size:12px}
+.hk .acts .ctl{white-space:nowrap}
+.cardnote{font-size:12px;color:var(--muted);line-height:1.45;margin:-4px 0 10px}
+.cardnote b{color:var(--text);font-weight:500}
+/* Looks tab */
+.lkhead,.lk{display:grid;grid-template-columns:minmax(0,1fr) 128px 60px;gap:8px;align-items:center}
+.lkhead{font-size:10px;color:var(--dim);letter-spacing:.08em;text-transform:uppercase;padding:0 8px 4px}
+.lkhead span:nth-child(n+2){text-align:center}
+.lkgrp{font-size:11px;color:var(--dim);letter-spacing:.06em;text-transform:uppercase;margin:10px 2px 6px}
+.lk{background:var(--surface2);border:1px solid var(--line);border-radius:var(--r);padding:4px 8px 4px 4px;margin-bottom:6px}
+.lk.on{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+.lk.open{border-color:var(--accent);border-radius:var(--r) var(--r) 0 0;margin-bottom:0}
+.lk .lkn{background:none;border:none;color:var(--text);font:inherit;text-align:left;cursor:pointer;padding:4px 6px;min-height:42px;min-width:0}
+.lk .t{display:block;font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lk .sub{display:block;font-size:11px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lk .sub.warn{color:var(--warn-text)}
+.lk select{min-height:34px;padding:0 6px;font-size:12px}
+.lk .lkl{display:flex;justify-content:center;align-items:center;min-height:34px;cursor:pointer}
+.lk .lkl input{width:20px;height:20px;accent-color:var(--accent);cursor:pointer}
+.lked{background:#171716;border:1px solid var(--accent);border-top:none;border-radius:0 0 10px 10px;padding:10px 10px 12px;margin-bottom:8px}
+.lkname{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:center}
+.lkname label{font-size:13px;color:var(--muted)}
+.lksub{display:flex;align-items:center;font-size:11px;color:var(--dim);letter-spacing:.06em;text-transform:uppercase;margin:14px 0 8px}
+.lksub .right{margin-left:auto}
+.lkacts{display:flex;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap}
+.lkacts .grow{flex:1;min-width:120px}
+.lock{display:flex;align-items:center;gap:8px;font-size:13px;margin-top:8px;padding:8px 10px;
+  border:1px dashed var(--line);border-radius:var(--r);color:var(--muted)}
+.lock svg{flex:none;color:var(--dim)}
+.lock .lv{margin-left:auto;font-size:12px;color:var(--text);text-align:right}
+
+details.fold{border-top:1px solid var(--line);margin-top:9px;padding-top:8px}
+details.fold summary{font-size:12px;color:var(--muted);cursor:pointer;list-style:none;
+  display:flex;align-items:center;gap:6px}
+details.fold summary::-webkit-details-marker{display:none}
+details.fold summary::before{content:"\25B8";font-size:10px;color:var(--dim);transition:transform .15s}
+details.fold[open] summary::before{transform:rotate(90deg)}
+details.fold .body{padding-top:9px}
+.form{display:grid;grid-template-columns:2fr 1fr;gap:8px}
+.form label{font-size:11px;color:var(--dim);display:block;margin-bottom:3px}
+.links{display:grid;gap:8px}
+.links a{display:flex;justify-content:space-between;align-items:center;text-decoration:none;
+  background:var(--surface2);border:1px solid var(--line);border-radius:var(--r);padding:12px;color:var(--text);font-size:14px}
+.links a span{font-size:11px;color:var(--dim)}
+#toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0));transform:translateX(-50%);
+  background:var(--surface2);border:1px solid var(--line);color:var(--text);font-size:13px;
+  padding:8px 14px;border-radius:20px;opacity:0;transition:opacity .2s;pointer-events:none}
+#toast.show{opacity:1}
+@media (max-width:520px){
+  .sub,.rev,.mark .divider{display:none}
+  .row{grid-template-columns:minmax(0,1fr) 1.6fr 48px}
+  .master .row{grid-template-columns:1fr 44px}
+  .master .row label{grid-column:1/-1}
+  .master{gap:12px}
+  .lkhead,.lk{grid-template-columns:minmax(0,1fr) 108px 44px;gap:6px}
+  .hk{grid-template-columns:minmax(0,1fr)}
+  .hk .acts{padding-left:44px}
+  .hk .acts select{flex:1;max-width:none}
+}
+</style>
+</head>
+<body class="offline">
+
+<header id="hdr">
+  <div class="mark">
+    <span class="wordmark">CANDLES</span>
+    <span class="divider"></span>
+    <span class="sub" id="hdr-name"></span>
+  </div>
+  <span class="badge" id="hdr-state">&mdash;</span>
+  <span class="conn bad" id="hdr-conn" title="Connection to the controller"><i></i>LINK</span>
+  <span class="rev" id="hdr-rev"></span>
+  <a class="wledbtn" id="lnk-wled" href="/wled.htm" title="Open the full WLED interface">WLED <span aria-hidden="true">&#8599;</span></a>
+</header>
+
+<nav id="tabs">
+  <button class="on" data-p="home">HomeKit</button>
+  <button data-p="looks">Looks</button>
+  <button data-p="pal">Palettes</button>
+  <button data-p="strings">Strings</button>
+  <button data-p="set" class="gear" title="Settings" aria-label="Settings"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M19.4 13a7.6 7.6 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.5 7.5 0 0 0-1.7-1L15 3.3h-4l-.4 2.6a7.5 7.5 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.6 7.6 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7.5 7.5 0 0 0 1.7 1l.4 2.6h4l.4-2.6a7.5 7.5 0 0 0 1.7-1l2.5 1 2-3.5zM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z"/></svg></button>
+</nav>
+<div id="alertbar" class="alertbar" role="alert"></div>
+
+<main id="main"><div class="wrap">
+
+<!-- HOMEKIT -->
+<section class="pane on" id="p-home">
+  <div class="livehost"><div class="live" id="live"></div></div>
+
+  <div class="card">
+    <div class="master">
+      <button class="ctl" id="power" aria-pressed="false">
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" d="M12 3v8M6.3 6.6a8 8 0 1 0 11.4 0"/></svg>
+        <span id="power-l">OFF</span>
+      </button>
+      <div>
+        <div class="row" style="margin:0">
+          <label>Brightness<small>Master, shared with HomeKit</small></label>
+          <input type="range" min="1" max="255" id="bri">
+          <span class="val" id="bri-v">&mdash;</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>HomeKit slots <button class="ctl small right" id="edit-slots">Rename</button></h3>
+    <p class="cardnote">The five looks HomeKit can pick, by name. Tap one to show it. To put a look in a slot, use the
+      <b>Slot</b> picker next to it on the <b>Looks</b> tab. <b>Rename</b> changes the names HomeKit shows.</p>
+    <div id="slots"></div>
+  </div>
+</section>
+
+<!-- LOOKS -->
+<section class="pane" id="p-looks">
+  <div class="livehost"></div>
+
+  <div class="card">
+    <h3>Looks <button class="ctl small right" id="look-new">+ New look</button></h3>
+    <p class="cardnote">A look is a flame behaviour plus one or more colours (palettes) alternating along the strings.
+      Tap a look to show it and change it. <b>Slot</b> puts it in a HomeKit slot; <b>Library</b> keeps it in your
+      library (looks without it live only in their slot).</p>
+    <div class="lkhead"><span>Look</span><span>Slot</span><span>Library</span></div>
+    <div id="looklist"></div>
+  </div>
+
+  <!-- The editor for the open look; moved under its row in the list. -->
+  <div id="lked-park" hidden>
+    <div class="lked" id="lked">
+      <div class="lkname"><label for="lk-name">Name</label><input type="text" id="lk-name" maxlength="32" autocomplete="off" spellcheck="false"></div>
+
+      <div class="lksub">Colours</div>
+      <div class="seg" id="pat-strings"></div>
+      <div class="grid g3" style="margin-top:8px" id="pat-quick">
+        <button class="ctl" data-q="single">One colour</button>
+        <button class="ctl" data-q="halloween">Halloween<span class="bsub">orange &middot; green &middot; purple</span></button>
+        <button class="ctl" data-q="christmas">Christmas<span class="bsub">red &middot; green &middot; white</span></button>
+      </div>
+      <div class="slots" id="pat-slots"></div>
+      <div class="acts" style="display:flex;gap:8px;margin-top:8px">
+        <button class="ctl small" id="pat-less">&minus; Colour</button>
+        <button class="ctl small" id="pat-more">+ Colour</button>
+      </div>
+      <p class="hint">Candle 1 takes colour 1, candle 2 colour 2, and so on along the string. Each colour is a palette:
+        make and change palettes on the <b>Palettes</b> tab.</p>
+
+      <div class="lksub">Flame <button class="ctl small right" id="fx-reset">Defaults</button></div>
+      <div class="seg" id="target"></div>
+      <div class="rule" id="fx-notice" hidden style="margin-top:8px">
+        <span class="grow" id="fx-notice-t"></span>
+        <button class="ctl small" id="fx-use">Use Candle Flame</button>
+      </div>
+      <div class="rule" id="mode-notice" hidden style="margin-top:8px">
+        <span class="grow" id="mode-notice-t"></span>
+        <button class="ctl small" id="mode-off">Turn off</button>
+      </div>
+      <div id="flame-card" style="margin-top:8px">
+        <div id="sliders"></div>
+        <div class="grid" id="toggles" style="margin-top:6px"></div>
+      </div>
+      <p class="hint">Every candle flickers on its own. <b>Warm white LED</b> lets the pixels' 3000&nbsp;K white LED
+        carry the pale, warm part of each colour; leave it on.</p>
+
+      <div class="lkacts">
+        <span class="grow pst" id="lk-st"></span>
+        <button class="ctl small" id="lk-undo">Undo changes</button>
+        <button class="ctl small on" id="lk-save">Save</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PALETTES -->
+<section class="pane" id="p-pal">
+  <div class="card">
+    <h3>Palettes <a class="ctl small right" id="lnk-cpal" href="/cpal.htm" style="text-decoration:none">More palettes &#8599;</a></h3>
+    <div id="pal-candle"></div>
+    <button class="ctl small" id="pal-new" style="margin:2px 0 4px">+ New palette</button>
+    <div id="pal-custom-wrap" hidden><div class="pal-sub">Made in WLED's palette maker</div><div id="pal-custom"></div></div>
+    <p class="hint" id="pal-pattern-note" hidden>A multicolour look is showing: tapping a palette here turns every
+      candle that one colour. Looks choose their colours on the Looks tab.</p>
+    <p class="hint">Tap a palette to try it on the candles. The flame picks its colour from the palette: the left end when it dips, the right end when it
+      stands tall. Bars show the light as the LEDs give it (white LED included). Tap <b>Edit</b> to change a Candle
+      palette's colours; looks that use it pick up the change. <b>+ New palette</b> starts a copy of the palette that's
+      showing for you to change. <b>More palettes</b> opens WLED's own palette maker.</p>
+    <details class="fold">
+      <summary>All palettes</summary>
+      <div class="body"><select id="pal-all"></select></div>
+    </details>
+  </div>
+
+</section>
+
+<!-- STRINGS -->
+<section class="pane" id="p-strings">
+  <div id="segcards"></div>
+  <div class="card">
+    <h3>Controller</h3>
+    <div class="kv" id="kv-info"></div>
+  </div>
+</section>
+
+<!-- SETTINGS -->
+<section class="pane" id="p-set">
+  <div class="card">
+    <h3>WLED</h3>
+    <div class="links">
+      <a href="/wled.htm" id="lnk-ui">Full WLED controls <span>segments, effects, presets</span></a>
+      <a href="/settings/leds" class="dev">LED preferences <span>outputs, colour order, current limit</span></a>
+      <a href="/settings/um" class="dev">Usermods <span>CandleFlame, PowerManager</span></a>
+      <a href="/settings/sec" class="dev">Security &amp; updates <span>PIN, OTA lock, backups</span></a>
+      <a href="/settings" class="dev">All settings <span></span></a>
+    </div>
+    <p class="hint">Design new segment layouts (holiday patterns) in the full WLED controls, then save them as
+      looks here.</p>
+  </div>
+</section>
+
+</div></main>
+<div id="toast"></div>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const qs = new URLSearchParams(location.search);
+const HOST = qs.get('host') || location.host;
+const BASE = (qs.get('host') ? 'http://' + HOST : '');
+
+// ---- State -----------------------------------------------------------------
+let S = null, I = null;               // last WLED state and info
+let effects = [], palNames = [];      // effect names by ID; built-in palette names by ID
+let palPrev = {};                     // palette ID -> preview stops
+let candleCfg = null;                 // um.CandleFlame from /json/cfg: editable Candle palettes ("pal<ID>": text)
+let cfgLocked = false;                // /json/cfg refused (settings PIN set and not entered)
+let palEdit = null;                   // palette being edited: {id, stops:[[idx,r,g,b]...], boost}
+let patStr = 'all';                   // Pattern card: which physical strings ('all' or row index)
+let presets = {};                     // preset ID -> {n, ...}
+// Presets 1-5 are HomeKit slots with fixed names; the library is 6+ (new looks from 10).
+// The firmware (candle_flame "CandleSlots") copies a library look into a slot without applying it,
+// and records where each slot's look came from in /candle-slots.json.
+// A slot's name lives in its preset (what HomeKit reads); these are the defaults. Renaming goes through the firmware too.
+const SLOT_DEFAULTS = ['Everyday', 'Halloween', 'Christmas', 'Evening', 'Special'];
+const isSlot = id => id >= 1 && id <= SLOT_DEFAULTS.length;
+const slotTitle = n => (presets[n] && presets[n].n) || (slotMeta[n] && slotMeta[n].slot) || SLOT_DEFAULTS[n - 1];
+// Is name already a slot's name (other than slot `except`)?
+const isSlotName = (name, except) => SLOT_DEFAULTS.some((d, i) => i + 1 !== except && slotTitle(i + 1).toLowerCase() === String(name).toLowerCase());
+let slotEditing = false;              // Slots card in rename mode
+let slotMeta = {};                    // slot -> {src (library number, 0 = built-in default), name, t, edited}
+let flameFx = -1;                     // ID of "Candle Flame" (assigned at boot)
+let target = 'all';                   // 'all' or a segment id
+let editing = false;
+// The look being edited. WLED forgets the active preset as soon as anything changes, so remember it here
+// (per browser) to offer "Save changes" back to the same slot and name.
+let curLook = 0;
+try { curLook = +localStorage.getItem('candles.look') || 0; } catch (e) {}
+function setCurLook(id) { curLook = id; try { localStorage.setItem('candles.look', id); } catch (e) {} }
+const busy = {};                      // control id -> time of last user input
+const BUSY_MS = 900;
+
+const SLIDERS = [
+  {k:'sx', name:'Speed',         sub:'How fast it flickers',      max:255},
+  {k:'ix', name:'Flicker depth', sub:'How far a flame can dip',   max:255},
+  {k:'c1', name:'Randomness',    sub:'How much candles differ',   max:255},
+  {k:'c2', name:'Softness',      sub:'Hard and jumpy to rolling', max:255},
+  {k:'c3', name:'Gusts',         sub:'How often a draft hits',    max:31},
+];
+// Unison (o1) and Spread palette (o2) are deliberately not offered: every candle must flicker on its own.
+// If either was switched on from WLED's own UI, the page says so and offers to switch it off.
+const TOGGLES = [{k:'o3', name:'Warm white LED'}];
+
+// ---- Transport: WebSocket first, HTTP fallback ------------------------------
+let ws = null, wsOk = false, lastMsg = 0, retry = 0, liveOn = false;
+function connect() {
+  try { ws = new WebSocket('ws://' + HOST + '/ws'); } catch (e) { scheduleRetry(); return; }
+  ws.binaryType = 'arraybuffer';
+  ws.onopen = () => { wsOk = true; retry = 0; lastMsg = Date.now(); setLink(true); updateLive(); };
+  ws.onclose = () => { wsOk = false; liveOn = false; setLink(false); scheduleRetry(); };
+  ws.onerror = () => { try { ws.close(); } catch (e) {} };
+  ws.onmessage = ev => {
+    lastMsg = Date.now();
+    if (typeof ev.data !== 'string') { onLive(new Uint8Array(ev.data)); return; }
+    if (ev.data === 'pong') return;
+    let j; try { j = JSON.parse(ev.data); } catch (e) { return; }
+    if (j.info) { I = j.info; }
+    if (j.state) { const prevPs = S && S.ps; S = j.state; if (prevPs !== S.ps || !Object.keys(presets).length) loadPresets(); }
+    render();
+  };
+}
+function scheduleRetry() { setTimeout(connect, Math.min(10000, 1000 * Math.pow(2, retry++))); }
+setInterval(() => {   // heartbeat; WLED answers "p" with "pong"
+  if (wsOk) { try { ws.send('p'); } catch (e) {} if (Date.now() - lastMsg > 45000) ws.close(); }
+}, 15000);
+
+function send(obj) {
+  if (wsOk && ws.readyState === 1) { ws.send(JSON.stringify(obj)); return; }
+  fetch(BASE + '/json/state', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(obj)})
+    .then(r => r.json()).then(j => { if (j && j.on !== undefined) { S = j; render(); } }).catch(() => setLink(false));
+}
+// Leading + trailing throttle per key, so slider drags stream without flooding the ESP32.
+const thr = {};
+function sendThrottled(key, obj) {
+  const t = thr[key] || (thr[key] = {last:0, timer:0, pending:null});
+  const now = Date.now();
+  t.pending = obj;
+  if (now - t.last > 80) { t.last = now; send(obj); t.pending = null; return; }
+  if (!t.timer) t.timer = setTimeout(() => { t.timer = 0; t.last = Date.now(); if (t.pending) send(t.pending); t.pending = null; }, 80);
+}
+
+function setLink(ok) {
+  const c = $('hdr-conn'); c.className = 'conn ' + (ok ? 'ok' : 'bad');
+  document.body.classList.toggle('offline', !ok);
+  const a = $('alertbar');
+  a.textContent = ok ? '' : "Can't reach the candles at " + HOST + ". Retrying…";
+  a.classList.toggle('show', !ok);
+  if (!ok) { $('hdr-state').textContent = 'offline'; $('hdr-state').className = 'badge bad'; }
+}
+
+// ---- Data loads ------------------------------------------------------------
+async function getJSON(path) { const r = await fetch(BASE + path, {cache:'no-store'}); return r.json(); }
+async function loadStatic() {
+  try {
+    effects = await getJSON('/json/eff');
+    flameFx = effects.indexOf('Candle Flame');
+    palNames = await getJSON('/json/pal');
+  } catch (e) {}
+  render();
+  // Palette previews come in pages; fetch them one at a time so the ESP32 isn't swamped.
+  try {
+    let page = 0, max = 0;
+    do {
+      const j = await getJSON('/json/palx?page=' + page);
+      max = j.m; Object.assign(palPrev, j.p); page++;
+      renderPalettes();
+    } while (page <= max);
+  } catch (e) {}
+}
+let presetTimer = 0;
+function loadPresets(delay) {
+  clearTimeout(presetTimer);
+  presetTimer = setTimeout(reloadPresets, delay || 0);
+}
+// Fetch presets.json and /candle-slots.json now. Await it before opening a row for a look that was just made:
+// renderLookList closes a row whose look isn't in `presets` (2026-11-07: a new look's row closed itself).
+async function reloadPresets() {
+  let j = null;
+  for (let i = 0; i < 4 && !j; i++) { j = await readPresets(); if (!j) await sleep(250); }
+  if (j) { presets = {}; for (const k in j) if (+k > 0 && j[k] && j[k].n) presets[k] = j[k]; }
+  try { const r = await fetch(BASE + '/candle-slots.json', {cache:'no-store'}); slotMeta = r.ok ? await r.json() : {}; }
+  catch (e) { slotMeta = {}; }
+  renderSlots(); if (S) renderLookList();
+}
+
+// ---- Live candles ----------------------------------------------------------
+function updateLive() {
+  const want = wsOk && !document.hidden && ($('p-home').classList.contains('on') || $('p-looks').classList.contains('on'));
+  if (want !== liveOn && wsOk) { ws.send(JSON.stringify({lv: want})); liveOn = want; }
+}
+document.addEventListener('visibilitychange', updateLive);
+let liveBuilt = '';
+function buildLive() {
+  if (!S) return;
+  const key = S.seg.map(g => g.start + '-' + g.stop).join(',');
+  if (key === liveBuilt) return;
+  liveBuilt = key;
+  const el = $('live'); el.innerHTML = '';
+  // One row per physical string: interleaved segments (alternating colours) overlap, so merge them.
+  const rows = stringsOf();
+  rows.forEach((r, i) => {
+    const row = document.createElement('div'); row.className = 'lrow';
+    const n = r.stop - r.start;
+    row.innerHTML = '<span class="lab">' + String.fromCharCode(65 + i) + '</span><div class="dots' + (n > 30 ? ' dense' : '') + '"></div>';
+    const dots = row.lastChild;
+    for (let p = r.start; p < r.stop; p++) { const d = document.createElement('i'); d.className = 'dot'; d.dataset.p = p; dots.appendChild(d); }
+    el.appendChild(row);
+  });
+  const cap = document.createElement('div'); cap.className = 'livecap';
+  cap.innerHTML = '<span>Live</span><span>' + rows.reduce((n, r) => n + r.stop - r.start, 0) + ' candles</span>'; el.appendChild(cap);
+}
+function onLive(b) {
+  if (b[0] !== 76) return;   // 'L'
+  const dots = $('live').querySelectorAll('.dot');
+  for (const d of dots) {
+    const o = 2 + 3 * (+d.dataset.p);
+    if (o + 2 >= b.length) continue;
+    const r = b[o], g = b[o + 1], bl = b[o + 2], m = Math.max(r, g, bl);
+    if (m < 4) { d.style.background = ''; d.style.boxShadow = ''; continue; }
+    const c = 'rgb(' + r + ',' + g + ',' + bl + ')';
+    d.style.background = c;
+    d.style.boxShadow = '0 0 ' + Math.round(3 + m / 32) + 'px rgba(' + r + ',' + g + ',' + bl + ',' + (m / 255 * .8).toFixed(2) + ')';
+  }
+}
+
+// ---- Rendering -------------------------------------------------------------
+// Physical strings = segment ranges merged where they overlap; each knows its segments in start order.
+function stringsOf() {
+  const segs = S.seg.slice().sort((a, b) => a.start - b.start), rows = [];
+  for (const g of segs) {
+    const r = rows[rows.length - 1];
+    if (r && g.start < r.stop) { r.stop = Math.max(r.stop, g.stop); r.segs.push(g.id); }
+    else rows.push({start: g.start, stop: g.stop, segs: [g.id]});
+  }
+  return rows;
+}
+// "String A" when a string is one segment; "A1", "A2"... when it's split into interleaved segments.
+function segName(g) {
+  if (g.n) return g.n;
+  const rows = stringsOf();
+  for (let i = 0; i < rows.length; i++) {
+    const k = rows[i].segs.indexOf(g.id);
+    if (k < 0) continue;
+    const L = String.fromCharCode(65 + i);
+    return rows[i].segs.length === 1 ? 'String ' + L : L + (k + 1);
+  }
+  return 'Segment ' + g.id;
+}
+function isBusy(id) { return busy[id] && Date.now() - busy[id] < BUSY_MS; }
+function palName(id) {
+  if (id > 200 && I && I.umpalnames && 255 - id < I.umpalnames.length) return I.umpalnames[255 - id];
+  if (id <= 200 && id > palNames.length && I && 200 - id < (I.cpalcount || 0)) return 'Custom ' + (201 - id);
+  return palNames[id] || ('Palette ' + id);
+}
+function targets() { return S ? S.seg.filter(g => target === 'all' || g.id === target) : []; }
+function segUpdate(fields) { return {seg: targets().map(g => Object.assign({id: g.id}, fields))}; }
+
+function render() {
+  if (!S) return;
+  $('hdr-state').textContent = S.on ? 'on' : 'off';
+  $('hdr-state').className = 'badge' + (S.on ? ' on' : '');
+  if (I) $('hdr-rev').textContent = 'WLED ' + I.ver;
+  if (I && I.name) $('hdr-name').textContent = I.name;   // WLED's device name (Config \u2192 User Interface)
+  document.title = (S.on ? '● ' : '') + 'Candles';
+  // power + brightness
+  $('power').classList.toggle('on', !!S.on); $('power').setAttribute('aria-pressed', S.on);
+  $('power-l').textContent = S.on ? 'ON' : 'OFF';
+  if (!isBusy('bri')) $('bri').value = S.bri;
+  $('bri-v').textContent = Math.round($('bri').value / 2.55) + '%';
+  buildLive();
+  if (S.ps > 0 && presets[S.ps]) setCurLook(S.ps);
+  if (showPending && S.ps === showPending.id) showPending = null;   // WLED confirmed the tapped look   // a look loaded from anywhere (HomeKit, WLED UI) becomes current
+  renderSlots(); renderLookList(); renderTarget(); renderFlame(); renderPattern(); renderPalettes(); renderStrings();
+}
+
+// Does what's showing differ from what look p stores? Compares each stored segment's look fields
+// (layout, effect, sliders, switches, palette, colours, on/off, segment brightness) with the live state.
+const LOOK_KEYS = ['start','stop','grp','spc','of','fx','sx','ix','c1','c2','c3','o1','o2','o3','pal','on','bri','col'];
+function lookDiffers(p) {
+  if (!p || !p.seg) return S.ps !== curLook;
+  const stored = p.seg.filter(x => x && x.stop !== 0 && x.id !== undefined);
+  const live = S.seg.filter(x => x.stop > x.start);
+  if (stored.length !== live.length) return true;
+  for (const a of stored) {
+    const b = live.find(x => x.id === a.id); if (!b) return true;
+    for (const k of LOOK_KEYS) if (a[k] !== undefined && JSON.stringify(a[k]) !== JSON.stringify(b[k])) return true;
+  }
+  return false;
+}
+// Before saving a look: if any string isn't running Candle Flame (e.g. WLED's power-on default "Solid" after a
+// restart), ask first. 2026-11-06: a restart's Solid default got saved over a look and every candle went flat.
+function confirmLookSave(name) {
+  if (flameFx < 0 || !S) return true;
+  const off = S.seg.filter(g => g.stop > g.start && g.fx !== flameFx);
+  if (!off.length) return true;
+  const fx = effects[off[0].fx] || ('effect ' + off[0].fx);
+  return confirm('\u201C' + name + '\u201D would be saved with ' + (off.length === S.seg.length ? 'every string' : 'some strings') +
+    ' on \u201C' + fx + '\u201D, not Candle Flame, so those candles won\u2019t flicker. Save anyway?');
+}
+// ---- HomeKit slots ---------------------------------------------------------
+const sameLook = (a, b) => !!a && !!b && JSON.stringify(a.seg) === JSON.stringify(b.seg) && a.mainseg === b.mainseg &&
+  JSON.stringify(a.playlist) === JSON.stringify(b.playlist);
+// Would replacing slot n lose a look that isn't kept anywhere else (library or built-in default)?
+function slotUnsaved(n) {
+  const p = presets[n], m = slotMeta[n];
+  if (!p) return false;
+  if (!m || m.edited) return true;
+  if (m.src == null || m.src < 0) return true;
+  if (m.src === 0) return false;
+  return !presets[m.src] || !sameLook(p, presets[m.src]);
+}
+function slotStatus(n) {
+  const p = presets[n], m = slotMeta[n];
+  if (!p) return {t: 'Empty — its HomeKit switch does nothing until a look is assigned', warn: true};
+  if (!m) return {t: 'Saved outside this page', warn: true};
+  const when = m.t > 1e9 ? ' · ' + new Date(m.t * 1000).toLocaleDateString(undefined, {day: 'numeric', month: 'short'}) : '';
+  if (m.src == null || m.src < 0) return {t: m.edited ? 'Saved here from the candles' + when : 'Saved outside this page', warn: !m.edited};
+  if (m.src === 0) return {t: (m.edited ? 'Default Everyday, edited here' : 'Default Everyday') + when, warn: !!m.edited};
+  const t = (m.name || 'Look') + ' #' + m.src;
+  if (m.edited) return {t: t + ', edited here' + when, warn: true};
+  if (!presets[m.src]) return {t: t + ' (since deleted from the library)' + when};
+  if (!sameLook(p, presets[m.src])) return {t: t + ' · differs from the library look now' + when, warn: true};
+  return {t: t + when};
+}
+// A slot or look the user just tapped: drawn as showing straight away, until WLED confirms (or 4 s pass).
+let showPending = null;
+function isPending(id) { return !!showPending && showPending.id === id && Date.now() - showPending.t < 4000; }
+function showLook(id) {
+  showPending = {id: id, t: Date.now()};
+  setCurLook(id);
+  if (S) S.on = true;
+  renderSlots(); renderLookList();
+  send({on: true, ps: id});
+}
+// ---- Looks tab ---------------------------------------------------------------
+// One row per look: library looks (presets 6+), then looks that live only in slots (one row for several slots that
+// hold the same look), and "Showing now" when the candles show something that isn't saved. Each row has a Slot picker
+// and a Library checkbox. Tapping a row shows the look and opens the editor (#lked) under it; the editor's controls
+// change the live candles, and Save writes them back to the look (and to the slots it's in).
+let openKey = '';                    // open row: 'L<library #>', 'S<first slot>' or 'N' (showing now)
+let lookListSig = '';
+const SLIDER_DEFAULTS = {sx: 80, ix: 90, c1: 100, c2: 110, c3: 6};
+// The library look that slot n is an unchanged copy of, or 0.
+function slotLinkedTo(n) {
+  const m = slotMeta[n], p = presets[n];
+  if (!p || !m || m.edited || !(m.src > 0) || isSlot(m.src) || !presets[m.src]) return 0;
+  return sameLook(p, presets[m.src]) ? m.src : 0;
+}
+function lookRows() {
+  const rows = [];
+  const lib = Object.keys(presets).map(Number).filter(id => !isSlot(id)).sort((a, b) => a - b);
+  for (const id of lib) rows.push({key: 'L' + id, kind: 'lib', id, name: presets[id].n, base: presets[id].n,
+    slots: SLOT_DEFAULTS.map((d, i) => i + 1).filter(n => slotLinkedTo(n) === id)});
+  for (let n = 1; n <= SLOT_DEFAULTS.length; n++) {
+    const p = presets[n]; if (!p || slotLinkedTo(n)) continue;
+    const g = rows.find(x => x.kind === 'slot' && sameLook(presets[x.id], p));
+    if (g) { g.slots.push(n); continue; }
+    const m = slotMeta[n] || {}, isDefault = m.src === 0 && !m.edited;
+    const base = m.src === 0 ? 'Default Everyday' : (m.name || slotTitle(n));
+    rows.push({key: 'S' + n, kind: 'slot', id: n, base, name: base + (m.edited ? ' (changed)' : ''), slots: [n], isDefault});
+  }
+  return rows;
+}
+const slotList = slots => slots.map(slotTitle).join(', ');
+function curRow() {
+  if (openKey === 'N') return {key: 'N', kind: 'now', id: 0, name: 'Showing now', base: '', slots: []};
+  return lookRows().find(r => r.key === openKey) || null;
+}
+const rowChanged = r => r.kind === 'now' || lookDiffers(presets[r.id]);
+function renderLookList() {
+  if (!S) return;
+  const el = $('looklist'), ed = $('lked');
+  let rows = lookRows();
+  if (openKey && openKey !== 'N' && !rows.some(r => r.key === openKey)) openKey = '';   // its look went away
+  const showNow = openKey === 'N' || (!openKey && !rows.some(r => !lookDiffers(presets[r.id])));
+  if (showNow) rows = [{key: 'N', kind: 'now', id: 0, name: 'Showing now', base: '', slots: []}].concat(rows);
+  const sig = JSON.stringify([openKey, rows.map(r => [r.key, r.name, r.slots]), SLOT_DEFAULTS.map((d, i) => slotTitle(i + 1))]);
+  const focused = document.activeElement && /INPUT|SELECT/.test(document.activeElement.tagName) &&
+    (el.contains(document.activeElement) || ed.contains(document.activeElement));
+  if ((sig !== lookListSig || !el.childElementCount) && !focused) {
+    lookListSig = sig;
+    $('lked-park').appendChild(ed);          // keep the editor while the rows are rebuilt
+    el.innerHTML = '';
+    let group = '';
+    for (const r of rows) {
+      const g = r.kind === 'lib' ? 'Library' : r.kind === 'slot' ? 'Only in a slot' : '';
+      if (g !== group && g) { const h = document.createElement('div'); h.className = 'lkgrp'; h.textContent = g; el.appendChild(h); }
+      group = g;
+      el.appendChild(buildLookRow(r));
+      if (r.key === openKey) el.appendChild(ed);
+    }
+    if (!rows.length) el.innerHTML = '<div class="empty">No looks yet: tap <b>+ New look</b>.</div>';
+  }
+  for (const d of el.querySelectorAll('.lk')) {   // live bits, updated in place (no rebuild under the pointer)
+    const r = rows.find(x => x.key === d.dataset.key); if (!r) continue;
+    const showing = !!S.on && r.kind !== 'now' && (isPending(r.id) || S.ps === r.id || r.slots.includes(S.ps) || !lookDiffers(presets[r.id]));
+    const changed = r.key === openKey && rowChanged(r) && r.kind !== 'now';
+    d.classList.toggle('on', showing); d.classList.toggle('open', r.key === openKey);
+    d.querySelector('.sub').textContent = (r.kind === 'now' ? 'Not saved yet' :
+      r.slots.length ? (r.kind === 'lib' ? 'In ' : 'Only in ') + slotList(r.slots) : 'Not in a slot') + (changed ? ' · changed, not saved' : '');
+    d.querySelector('.sub').classList.toggle('warn', changed);
+  }
+  renderLookEditor(rows.find(r => r.key === openKey));
+}
+function buildLookRow(r) {
+  const d = document.createElement('div'); d.className = 'lk'; d.dataset.key = r.key;
+  d.innerHTML = '<button class="lkn"><span class="t"></span><span class="sub"></span></button>' +
+    '<select class="lks" aria-label="Slot"></select><label class="lkl" title="Keep in your library"><input type="checkbox" aria-label="In library"></label>';
+  d.querySelector('.t').textContent = r.name;
+  d.querySelector('.lkn').onclick = () => openLook(r);
+  const sel = d.querySelector('select');
+  const o0 = document.createElement('option'); o0.value = '';
+  o0.textContent = r.slots.length > 1 ? r.slots.length + ' slots' : '—'; sel.appendChild(o0);
+  SLOT_DEFAULTS.forEach((x, i) => { const o = document.createElement('option'); o.value = i + 1; o.textContent = (i + 1) + ' ' + slotTitle(i + 1); sel.appendChild(o); });
+  if (r.slots.length === 1) sel.value = r.slots[0];
+  sel.onchange = () => {
+    const n = +sel.value; sel.blur();
+    if (n && !(r.slots.length === 1 && r.slots[0] === n)) putInSlot(r, n);
+    lookListSig = ''; renderLookList();
+  };
+  const cb = d.querySelector('input');
+  cb.checked = r.kind === 'lib';
+  cb.onchange = () => { const want = cb.checked; cb.checked = !want; (want ? addToLibrary(r) : removeFromLibrary(r)); };
+  return d;
+}
+function openLook(r) {
+  if (openKey === r.key) { openKey = ''; lookListSig = ''; renderLookList(); return; }
+  openKey = r.key;
+  if (r.kind === 'now') setCurLook(0); else showLook(r.id);
+  lookListSig = ''; renderLookList();
+  const row = $('looklist').querySelector('.lk.open'); if (row) row.scrollIntoView({block: 'nearest'});
+}
+function renderLookEditor(r) {
+  if (!r) { $('lked-park').appendChild($('lked')); return; }
+  const nm = $('lk-name');
+  if (document.activeElement !== nm) { nm.value = r.kind === 'now' ? '' : r.base; nm.placeholder = r.kind === 'now' ? 'Name it, then save' : ''; }
+  nm.disabled = !!r.isDefault;
+  nm.title = r.isDefault ? 'The built-in look keeps its name; save it to your library to name a copy' : '';
+  const changed = rowChanged(r), save = $('lk-save'), undo = $('lk-undo');
+  save.textContent = r.kind === 'now' ? 'Save to library' : changed ? 'Save changes' : 'Saved';
+  save.disabled = !changed; save.classList.toggle('on', changed);
+  undo.hidden = r.kind === 'now'; undo.disabled = !changed;
+  $('lk-st').textContent = r.kind === 'now' ? 'Or pick a slot for it above' :
+    changed && r.slots.length ? 'Saving also updates ' + slotList(r.slots) : '';
+}
+// psave live state into preset id and wait until presets.json shows the new content.
+// presets.json, or null if it can't be read right now (WLED serves it half-written while it's saving).
+async function readPresets() { try { return await getJSON('/presets.json'); } catch (e) { return null; } }
+async function psaveAndWait(id, name, extra) {
+  let pj = null;
+  for (let i = 0; i < 6 && !pj; i++) { pj = await readPresets(); if (!pj) await sleep(200); }
+  if (!pj) return false;
+  const before = JSON.stringify(pj[id] || null);
+  if (!await postState(Object.assign({psave: id, n: name, ib: false, sb: true}, extra || {}))) return false;
+  for (let i = 0; i < 20; i++) {
+    await sleep(250);
+    const j = await readPresets();
+    if (j && JSON.stringify(j[id] || null) !== before) return true;
+  }
+  return false;
+}
+const savedMeta = (n, name) => ({CandleSlots: {saved: {id: n, n: name}, t: Math.floor(Date.now() / 1000), rq: newRq()}});
+async function saveOpenLook() {
+  const r = curRow(); if (!r) return;
+  if (r.kind === 'now') {
+    const name = askLookName('Name this look for your library.', $('lk-name').value.trim() || suggestName('My'));
+    if (!name) return;
+    toast('Saving ' + name + '…');
+    const id = await saveToLibrary(name);
+    if (id) { openKey = 'L' + id; lookListSig = ''; renderLookList(); toast(name + ' saved to your library'); } else toast('Not saved: no answer from the controller');
+    return;
+  }
+  if (!confirmLookSave(r.base)) return;
+  toast('Saving ' + r.base + '…');
+  let ok;
+  if (r.kind === 'lib') {
+    ok = await psaveAndWait(r.id, presets[r.id].n);
+    for (const n of r.slots) if (ok) ok = !await slotCmd({assign: {from: r.id, to: n}});   // keep its slots in step
+  } else {
+    const [first, ...rest] = r.slots;
+    ok = await psaveAndWait(first, slotTitle(first), savedMeta(first, r.base));
+    for (const n of rest) if (ok) ok = !await slotCmd({assign: {from: first, to: n}}) && !await slotCmd({saved: {id: n, n: r.base}});
+  }
+  await reloadPresets();
+  toast(ok ? 'Saved ' + r.base + (r.slots.length ? ' (and ' + slotList(r.slots) + ')' : '') : 'Not saved: no answer from the controller');
+}
+async function putInSlot(r, n) {
+  const slot = slotTitle(n);
+  const elsewhere = SLOT_DEFAULTS.some((d, i) => i + 1 !== n && presets[i + 1] && presets[n] && sameLook(presets[i + 1], presets[n]));
+  if (slotUnsaved(n) && !elsewhere && !confirm(slot + ' holds a look that isn’t saved anywhere else. Replace it?')) return;
+  let err = '';
+  if (r.kind === 'now') {
+    const name = askLookName('Name this look. It goes into ' + slot + '.', $('lk-name').value.trim() || suggestName(slot));
+    if (!name) return;
+    toast('Saving ' + name + ' in ' + slot + '…');
+    err = await psaveAndWait(n, slot, savedMeta(n, name)) ? '' : 'no answer from the controller';
+    if (!err) await reloadPresets();
+    if (!err && openKey === 'N') openKey = 'S' + n;
+  } else {
+    toast('Putting ' + r.base + ' in ' + slot + '…');
+    if (r.isDefault) err = await slotCmd({restore: n});
+    else {
+      err = await slotCmd({assign: {from: r.id, to: n}});
+      if (!err && r.kind === 'slot') err = await slotCmd({saved: {id: n, n: r.base}});
+    }
+  }
+  await reloadPresets(); lookListSig = ''; renderLookList();
+  toast(err ? 'Not done: ' + err : (r.kind === 'now' ? 'Saved in ' : r.base + ' is now in ') + slot);
+}
+async function addToLibrary(r) {
+  if (r.kind === 'now') { await saveOpenLookAs(); return; }
+  let name = r.base; if (isSlotName(name)) name += ' look';
+  const keepOpen = openKey === r.key;   // background reloads during the steps below may close the row
+  toast('Adding ' + name + ' to your library…');
+  try {
+    const pj = await readPresets();
+    const id = pj && nextFreeSlot(pj);
+    if (!id) { toast(pj ? 'The library is full' : 'Not added: couldn\u2019t read the looks; try again'); return; }
+    let err = await slotCmd({assign: {from: r.id, to: id}});
+    if (!err) err = await slotCmd({rename: {id: id, n: name}});
+    for (const n of r.slots) if (!err) err = await slotCmd({assign: {from: id, to: n}});   // the slots now point at it
+    if (!err && keepOpen) openKey = 'L' + id;   // before the reload, which drops unknown rows
+    await reloadPresets();
+    lookListSig = ''; renderLookList();
+    toast(err ? 'Not added: ' + err : name + ' is in your library');
+  } catch (e) { toast('Not added: connection failed'); }
+}
+async function saveOpenLookAs() {   // "Showing now" -> library
+  const name = askLookName('Name this look for your library.', $('lk-name').value.trim() || suggestName('My'));
+  if (!name) return;
+  const id = await saveToLibrary(name);
+  if (id && (openKey === 'N' || !openKey)) { openKey = 'L' + id; lookListSig = ''; renderLookList(); }
+  toast(id ? name + ' saved to your library' : 'Not saved: no answer from the controller');
+}
+async function removeFromLibrary(r) {
+  if (r.kind !== 'lib') return;
+  if (!r.slots.length && !confirm('“' + r.name + '” isn’t in any slot, so taking it out of the library deletes it. Delete it?')) return;
+  try { if (!await postState({pdel: r.id})) throw new Error('no answer'); }
+  catch (e) { toast('Not removed: connection failed'); return; }
+  if (openKey === r.key) openKey = r.slots.length ? 'S' + r.slots[0] : '';   // before the reload, which drops unknown rows
+  if (curLook === r.id) setCurLook(0);
+  await sleep(300); await reloadPresets();
+  lookListSig = ''; renderLookList();
+  toast(r.slots.length ? r.name + ' left the library; ' + slotList(r.slots) + ' keeps it' : 'Deleted ' + r.name);
+}
+async function renameOpenLook(v) {
+  const r = curRow(); if (!r || r.kind === 'now' || r.isDefault) return;
+  if (r.kind === 'lib') { await renamePreset(r.id, v, $('lk-name')); return; }
+  for (const n of r.slots) { const err = await slotCmd({saved: {id: n, n: v}}); if (err) { toast('Not renamed: ' + err); return; } }
+  toast('Renamed to ' + v);
+}
+// A fresh one-colour look on every string (Candle Flame, default sliders, palette 255), saved to the library.
+async function newLook() {
+  if (flameFx < 0) { toast('Candle Flame isn’t loaded yet'); return; }
+  const name = askLookName('Name the new look.', suggestName('New'));
+  if (!name) return;
+  const rows = stringsOf(), upd = [];
+  for (const r of rows) {
+    const ids = r.segs.slice().sort((a, b) => a - b);
+    upd.push(Object.assign({id: ids[0], start: r.start, stop: r.stop, grp: 1, spc: 0, of: 0, on: true, bri: 255,
+      fx: flameFx, pal: 255, o1: false, o2: false, o3: true}, SLIDER_DEFAULTS));
+    for (const id of ids.slice(1)) upd.push({id, stop: 0});
+  }
+  try { if (!await postState({on: true, seg: upd})) throw new Error('no answer'); }
+  catch (e) { toast('Not made: connection failed'); return; }
+  await sleep(300);
+  const id = await saveToLibrary(name);
+  if (!id) { toast('Not saved: no answer from the controller'); return; }
+  openKey = 'L' + id; lookListSig = '';
+  renderLookList();
+  toast(name + ' made: choose its colours and flame below, then Save');
+}
+
+// Rows are rebuilt only when something they show changes: rebuilding a button between press and release
+// swallows the click (2026-11-07: taps on slots were often lost).
+let slotsSig = '';
+function renderSlots() {
+  const el = $('slots');
+  if (slotEditing && el.contains(document.activeElement)) return;   // don't rebuild while a name is being typed
+  const rows = SLOT_DEFAULTS.map((d, i) => {
+    const n = i + 1, p = presets[n], name = slotTitle(n);
+    const active = !!p && (isPending(n) || !!(S && S.on && (S.ps === n || (curLook === n && !lookDiffers(p)))));
+    return {n: n, name: name, has: !!p, st: slotStatus(n), active: active};
+  });
+  const sig = JSON.stringify([slotEditing, rows]);
+  if (sig === slotsSig && el.childElementCount) return;
+  slotsSig = sig;
+  el.innerHTML = '';
+  $('edit-slots').classList.toggle('on', slotEditing);
+  $('edit-slots').textContent = slotEditing ? 'Done' : 'Rename';
+  for (const r of rows) {
+    const n = r.n, name = r.name;
+    if (slotEditing) {   // name field per slot (no delete: every slot always exists for HomeKit)
+      const d = document.createElement('div'); d.className = 'lookedit';
+      d.innerHTML = '<input type="text" maxlength="32" autocomplete="off" spellcheck="false"><span class="bsub">Slot ' + n + '</span>';
+      const inp = d.querySelector('input');
+      inp.value = name; inp.disabled = !r.has; inp.setAttribute('aria-label', 'Name of slot ' + n);
+      inp.onkeydown = e => { if (e.key === 'Enter') inp.blur(); if (e.key === 'Escape') { inp.value = name; inp.blur(); } };
+      inp.onblur = () => { const v = inp.value.trim(); if (v && v !== name) renamePreset(n, v, inp); else inp.value = name; };
+      el.appendChild(d);
+      continue;
+    }
+    const row = document.createElement('div'); row.className = 'hk' + (r.active ? ' on' : '');
+    row.innerHTML = '<button class="show"><span class="num">' + n + '</span><span class="nm"><span class="t"></span>' +
+      '<span class="src"></span></span></button><div class="acts"></div>';
+    row.querySelector('.t').textContent = name;
+    const src = row.querySelector('.src'); src.textContent = r.st.t; src.classList.toggle('warn', !!r.st.warn);
+    const show = row.querySelector('.show');
+    show.disabled = !r.has; show.title = r.has ? 'Show ' + name : '';
+    show.onclick = () => showLook(n);
+    if (n === 1) {
+      const r1 = document.createElement('button'); r1.className = 'ctl small'; r1.textContent = 'Restore default';
+      r1.title = 'Put the built-in default look back in this slot (doesn\u2019t change what\u2019s showing)';
+      r1.onclick = restoreEveryday;
+      row.querySelector('.acts').appendChild(r1);
+    }
+    el.appendChild(row);
+  }
+}
+// Library names: letters, digits, spaces, - and _ (HomeKit never sees library looks, so spaces are fine).
+const cleanName = v => v.replace(/[^A-Za-z0-9 _-]/g, '').replace(/\s+/g, ' ').replace(/^\s+/, '').slice(0, 32);
+function suggestName(slot) {
+  const taken = new Set(Object.values(presets).map(p => p.n.toLowerCase()));
+  for (let i = 1; ; i++) { const s = slot + ' look' + (i > 1 ? ' ' + i : ''); if (!taken.has(s.toLowerCase())) return s; }
+}
+let rqSeq = 0;
+function newRq() { return (Math.floor(Date.now() / 1000) % 1000000) * 100 + (rqSeq++ % 100); }
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+// Send a CandleSlots command; the firmware does it in its main loop and reports {rq, err} in /json/state.
+async function slotCmd(cmd) {
+  const rq = newRq();
+  const body = {CandleSlots: Object.assign({t: Math.floor(Date.now() / 1000), rq: rq}, cmd)};
+  try {
+    if (!await postState(body)) throw new Error('no answer');
+    for (let i = 0; i < 16; i++) {
+      await sleep(250);
+      const s = await getJSON('/json/state');
+      if (!s.CandleSlots) return 'the firmware has no slot support (update it)';
+      if (s.CandleSlots.rq === rq) { loadPresets(); return s.CandleSlots.err || ''; }
+    }
+    return 'no answer from the controller';
+  } catch (e) { loadPresets(); return 'connection failed'; }
+}
+async function restoreEveryday() {
+  if (slotUnsaved(1) && !confirm(slotTitle(1) + ' holds a look that isn’t in the library. Replace it with the built-in default look?')) return;
+  const err = await slotCmd({restore: 1});
+  toast(err ? 'Not restored: ' + err : slotTitle(1) + ' is back to the built-in default look');
+}
+
+function nextFreeSlot(p) {   // next free library number: 10 up, then 6-9 (p: a fresh presets.json, else our copy)
+  const has = i => p ? !!(p[i] && p[i].n) : !!presets[i];
+  for (let i = 10; i <= 250; i++) if (!has(i)) return i;
+  for (let i = 6; i < 10; i++) if (!has(i)) return i;
+  return 0;
+}
+
+// Rename a slot or library look. The firmware rewrites just the name in presets.json (CandleSlots rename), so
+// the live candles never change. (Before 2026-11-07 the page re-posted the look with psave+o:true, which WLED
+// applies to the live candles first, and had to put the live state back right after.)
+async function renamePreset(id, name, inp) {
+  const p = presets[id]; if (!p || p.playlist) return;
+  const back = () => { if (inp) inp.value = p.n; };
+  if (name.length > 32) { toast('Names can be up to 32 characters'); back(); return; }
+  if (isSlot(id)) {
+    if (isSlotName(name, id)) { toast('Another slot is already called ' + name); back(); return; }
+  } else {
+    if (isSlotName(name)) { toast(name + ' is a slot\u2019s name; pick another'); back(); return; }
+    const dup = Object.keys(presets).find(k => +k !== id && presets[k].n === name);
+    if (dup && !confirm('Another look (#' + dup + ') is already called "' + name + '". Use it anyway?')) { back(); return; }
+  }
+  const old = p.n;
+  const err = await slotCmd({rename: {id: id, n: name}});
+  if (err) { toast('Not renamed: ' + err); back(); return; }
+  toast(isSlot(id) ? 'Slot ' + id + ' is now ' + name + '. HomeKit shows the new name once the plugin refreshes.'
+                   : old + ' is now ' + name);
+}
+
+function renderTarget() {
+  const el = $('target');
+  const opts = [{v:'all', l:S.seg.length > 2 ? 'All' : 'Both'}].concat(S.seg.map(g => ({v:g.id, l:segName(g)})));
+  if (S.seg.length < 2) opts.shift();
+  if (!opts.some(o => o.v === target)) target = opts[0].v;
+  const key = opts.map(o => o.v + o.l).join('|') + target;
+  if (el.dataset.k === key) return; el.dataset.k = key;
+  el.innerHTML = '';
+  for (const o of opts) {
+    const b = document.createElement('button'); b.className = 'ctl' + (o.v === target ? ' on' : '');
+    b.textContent = o.l; b.onclick = () => { target = o.v; render(); };
+    el.appendChild(b);
+  }
+}
+
+function renderFlame() {
+  const segs = targets(); if (!segs.length) return;
+  const g = segs[0];
+  const notFlame = segs.filter(x => x.fx !== flameFx);
+  $('fx-notice').hidden = flameFx < 0 || notFlame.length === 0;
+  if (notFlame.length) {
+    const fxn = effects[notFlame[0].fx] || ('effect ' + notFlame[0].fx);
+    $('fx-notice-t').textContent = (notFlame.length === segs.length ? 'Running ' : 'Partly running ') + '“' + fxn +
+      '”. These controls are for Candle Flame, where each candle flickers on its own.';
+  }
+  $('flame-card').style.opacity = notFlame.length === segs.length ? .5 : 1;
+  const sl = $('sliders');
+  if (!sl.children.length) {
+    for (const s of SLIDERS) {
+      const r = document.createElement('div'); r.className = 'row';
+      r.innerHTML = '<label>' + s.name + '<small>' + s.sub + '</small></label><input type="range" min="0" max="' + s.max + '" id="s-' + s.k + '"><span class="val" id="v-' + s.k + '"></span>';
+      sl.appendChild(r);
+      const inp = r.querySelector('input');
+      inp.oninput = () => { busy['s-' + s.k] = Date.now(); showVal(s); sendThrottled('s-' + s.k, segUpdate({[s.k]: +inp.value})); };
+    }
+    for (const t of TOGGLES) {
+      const b = document.createElement('button'); b.className = 'ctl'; b.id = 't-' + t.k; b.textContent = t.name;
+      b.onclick = () => { const v = !b.classList.contains('on'); b.classList.toggle('on', v); busy['t-' + t.k] = Date.now(); send(segUpdate({[t.k]: v})); };
+      $('toggles').appendChild(b);
+    }
+  }
+  for (const s of SLIDERS) { if (!isBusy('s-' + s.k)) $('s-' + s.k).value = g[s.k]; showVal(s); }
+  for (const t of TOGGLES) if (!isBusy('t-' + t.k)) $('t-' + t.k).classList.toggle('on', !!g[t.k]);
+  const odd = S.seg.filter(x => x.fx === flameFx && (x.o1 || x.o2));
+  $('mode-notice').hidden = odd.length === 0;
+  if (odd.length) $('mode-notice-t').textContent = odd.map(x => segName(x) + ': ' + [x.o1 && 'Unison', x.o2 && 'Spread palette'].filter(Boolean).join(' + ')).join(', ') +
+    ' (set in WLED\u2019s own controls). Its candles don\u2019t flicker individually.';
+}
+function showVal(s) { const v = +$('s-' + s.k).value; $('v-' + s.k).textContent = s.max === 31 ? v : Math.round(v / 2.55) + '%'; }
+
+// Candle palette text (see candle_core.h): "idx:RRGGBB ... [bNNN]"
+function parsePalText(t) {
+  const out = {stops: [], boost: 100};
+  for (const tok of String(t || '').trim().split(/[\s,]+/)) {
+    if (!tok) continue;
+    if (tok[0] === 'b' || tok[0] === 'B') { out.boost = +tok.slice(1) || 100; continue; }
+    const m = /^(\d{1,3}):([0-9a-fA-F]{6})$/.exec(tok); if (!m) return null;
+    const v = parseInt(m[2], 16); out.stops.push([+m[1], v >> 16, (v >> 8) & 255, v & 255]);
+  }
+  return out.stops.length >= 2 ? out : null;
+}
+function palText(p) {
+  const h = v => v.toString(16).padStart(2, '0').toUpperCase();
+  return p.stops.map(s => s[0] + ':' + h(s[1]) + h(s[2]) + h(s[3])).join(' ') + (p.boost !== 100 ? ' b' + p.boost : '');
+}
+// The editor lets every colour move. WLED needs stops at exactly 0 and 255, so when the end colours sit
+// inside, a hidden copy is saved at 0/255 (the flame holds that colour out to the end). On load, an end
+// pair with the same colour shows as one movable colour.
+function toEditable(stops) {
+  const st = stops.map(x => x.slice()), same = (a, b) => a[1] === b[1] && a[2] === b[2] && a[3] === b[3];
+  if (st.length > 2 && st[st.length - 1][0] === 255 && same(st[st.length - 1], st[st.length - 2])) st.pop();
+  if (st.length > 2 && st[0][0] === 0 && same(st[0], st[1])) st.shift();
+  return st;
+}
+function toSaved(stops) {
+  const st = stops.map(x => x.slice());
+  if (st[0][0] > 0) st.unshift([0, st[0][1], st[0][2], st[0][3]]);
+  if (st[st.length - 1][0] < 255) { const l = st[st.length - 1]; st.push([255, l[1], l[2], l[3]]); }
+  return st;
+}
+// Candle palettes are IDs 255 down: 10 built-ins (255-246), then the user's own (245 down, added on this page).
+// A deleted user palette stays registered as a grey "(unused)" placeholder so later IDs don't move.
+const UM_UNUSED = 'Candle: (unused)';
+const umCount = () => (I && I.umpalnames) ? I.umpalnames.length : 0;
+const umName = id => ((I && I.umpalnames && I.umpalnames[255 - id]) || '').replace(/^Candle:\s*/, '');
+const umUsed = id => !!(I && I.umpalnames && I.umpalnames[255 - id] && I.umpalnames[255 - id] !== UM_UNUSED);
+const isUserPal = id => id <= 245 && id >= 226;
+function candlePal(id) { return candleCfg && candleCfg['pal' + id] ? parsePalText(candleCfg['pal' + id]) : null; }
+// What the LEDs give for a palette colour: with "Warm white LED" on, the part matching the 3000 K white LED
+// (255,177,110) moves to W (times the palette's boost); W is drawn as a cream white so W-heavy colours read
+// as white on screen, not as the orange a 3000 K colour looks like on a monitor.
+function litColor(r, g, b, boost, useW) {
+  if (!useW) return [r, g, b];
+  const k = Math.max(0, Math.min(1, r / 255, g / 177, b / 110));
+  const w = Math.min(255, k * 255 * (boost || 100) / 100);
+  let R = r - k * 255 + w, G = g - k * 177 + w * 0.90, B = b - k * 110 + w * 0.78;
+  const m = Math.max(R, G, B); if (m > 255) { R *= 255 / m; G *= 255 / m; B *= 255 / m; }
+  return [R, G, B].map(x => Math.round(Math.max(0, x)));
+}
+function stopsCss(stops, boost, useW) {
+  return 'linear-gradient(90deg,' + stops.map(s => 'rgb(' + litColor(s[1], s[2], s[3], boost, useW).join(',') + ') ' + (s[0] / 2.55).toFixed(1) + '%').join(',') + ')';
+}
+async function loadCandleCfg() {
+  try {
+    const r = await fetch(BASE + '/json/cfg', {cache: 'no-store'});
+    if (r.status === 401) { cfgLocked = true; return; }
+    const j = await r.json(); candleCfg = (j.um && j.um.CandleFlame) || null; cfgLocked = false;
+  } catch (e) {}
+  renderPalettes();
+}
+let cfgTimer = 0;
+let saveState = '';   // '', 'saving', 'saved', 'failed' (shown in the palette editor)
+function setSaveState(st) { saveState = st; const e = $('pe-status'); if (e) { e.textContent = {saving: 'Saving\u2026', saved: 'Saved', failed: 'Not saved \u2014 check the connection'}[st] || ''; e.className = 'pst ' + st; } }
+function savePalEdit() {   // debounced: WLED writes cfg.json to flash on each save
+  clearTimeout(cfgTimer);
+  const id = palEdit.id, text = palText({stops: toSaved(palEdit.stops), boost: palEdit.boost});
+  if (candleCfg) candleCfg['pal' + id] = text;
+  setSaveState('saving');
+  cfgTimer = setTimeout(async () => { setSaveState(await postCfg({['pal' + id]: text}) ? 'saved' : 'failed'); }, 350);
+}
+// POST settings; true only when WLED confirms. WLED answers {"error":3} when its JSON buffer is busy, so retry.
+// POST to /json/state, retried: the controller's web server sometimes drops a request (2026-11-07: "+ New look"
+// failed once with a network error and worked on the next try).
+async function postState(body) {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    try {
+      const r = await fetch(BASE + '/json/state', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+      const j = await r.json().catch(() => ({}));
+      if (r.ok && j && j.success !== false && !j.error) return true;
+    } catch (e) {}
+    await new Promise(res => setTimeout(res, 250 * (attempt + 1)));
+  }
+  return false;
+}
+async function postCfg(fields) {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    try {
+      const r = await fetch(BASE + '/json/cfg', {method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({um: {CandleFlame: fields}})});
+      if (r.status === 401) { cfgLocked = true; toast('Settings are locked: enter the PIN in WLED settings'); return false; }
+      const j = await r.json().catch(() => ({}));
+      if (j && j.success) return true;
+    } catch (e) {}
+    await new Promise(res => setTimeout(res, 250 * (attempt + 1)));
+  }
+  return false;
+}
+
+function gradCss(id, g) {
+  const useW = !!(g && g.o3);
+  const cp = id > 245 ? candlePal(id) : null;
+  if (cp) return stopsCss(cp.stops, cp.boost, useW);
+  const p = palPrev[id]; if (!p) return '';
+  const col = c => 'rgb(' + c.slice(0, 3).join(',') + ')';
+  const segCol = k => { const c = (g && g.col && g.col[k]) || [255, 160, 0]; return col(c); };
+  let stops;
+  if (typeof p[0] === 'string') {   // tokens: c1/c2/c3 = segment colours, r = random
+    stops = p.map(t => t === 'r' ? 'rgb(' + [0, 0, 0].map(() => (Math.random() * 255) | 0).join(',') + ')' : segCol(+t.slice(1) - 1));
+    return 'linear-gradient(90deg,' + stops.join(',') + ')';
+  }
+  return stopsCss(p, 100, useW);
+}
+function renderPalettes() {
+  if (!S) return;
+  const g = targets()[0]; if (!g) return;
+  const el = $('pal-candle');
+  const n = umCount(), ids = [];
+  for (let j = 0; j < n; j++) if (umUsed(255 - j)) ids.push(255 - j);
+  if (el.dataset.k !== ids.join(',')) {
+    el.dataset.k = ids.join(','); el.innerHTML = '';
+    for (const id of ids) {
+      const row = document.createElement('div'); row.className = 'palrow'; row.dataset.id = id;
+      const b = document.createElement('button');
+      b.className = 'pal'; b.dataset.id = id;
+      b.innerHTML = '<span></span><span class="bar"></span>';
+      b.firstChild.textContent = umName(id);
+      b.onclick = () => { busy.pal = Date.now(); markPal(id); send(segUpdate({pal: id})); };
+      const e = document.createElement('button'); e.className = 'ctl pedit'; e.textContent = 'Edit';
+      e.onclick = () => openPalEdit(id);
+      row.append(b, e); el.appendChild(row);
+    }
+  }
+  // the user's own palettes (palette editor), IDs 200 downward; skip WLED's grey gap placeholders
+  const cc = $('pal-custom'), cn = (I && I.cpalcount) || 0, cids = [];
+  for (let j = 0; j < cn; j++) {
+    const id = 200 - j, pd = palPrev[id];
+    if (pd && pd.length === 16 && pd.every(e => e[1] === 128 && e[2] === 128 && e[3] === 128)) continue;
+    cids.push(id);
+  }
+  if (cc.dataset.k !== cids.join(',')) {
+    cc.dataset.k = cids.join(','); cc.innerHTML = '';
+    cids.forEach((id, k) => {
+      const b = document.createElement('button'); b.className = 'pal'; b.dataset.id = id;
+      b.innerHTML = '<span></span><span class="bar"></span>'; b.firstChild.textContent = 'Custom ' + (k + 1);
+      b.onclick = () => { busy.pal = Date.now(); markPal(id); send(segUpdate({pal: id})); };
+      cc.appendChild(b);
+    });
+  }
+  $('pal-custom-wrap').hidden = cids.length === 0;
+  for (const b of [...el.querySelectorAll('.pal'), ...cc.children]) { const css = gradCss(+b.dataset.id, g); if (css) b.lastChild.style.background = css; }
+  for (const r of el.querySelectorAll('.palrow')) r.querySelector('.pedit').classList.toggle('on', !!palEdit && palEdit.id === +r.dataset.id);
+  renderPalEdit();
+  const pr = stringsOf().filter((r, i) => r.segs.length > 1);
+  $('pal-pattern-note').hidden = pr.length === 0;
+  if (!isBusy('pal')) markPal(g.pal);
+  const sel = $('pal-all');
+  const allKey = ids.map(umName).join('|') + '/' + palNames.length + '/' + ((I && I.cpalcount) || 0);
+  if (sel.dataset.k !== allKey) {
+    sel.dataset.k = allKey; sel.innerHTML = '';
+    const add = (id, name) => { const o = document.createElement('option'); o.value = id; o.textContent = name; sel.appendChild(o); };
+    for (const id of ids) add(id, 'Candle: ' + umName(id));
+    for (let j = 0; j < ((I && I.cpalcount) || 0); j++) add(200 - j, 'Custom ' + (j + 1));
+    palNames.forEach((nm, id) => add(id, nm));
+    sel.onchange = () => { busy.pal = Date.now(); markPal(+sel.value); send(segUpdate({pal: +sel.value})); };
+  }
+  if (!isBusy('pal')) sel.value = g.pal;
+}
+function markPal(id) { for (const b of [...$('pal-candle').querySelectorAll('.pal'), ...$('pal-custom').children]) b.classList.toggle('on', +b.dataset.id === id); }
+
+// A Candle palette was renamed: update every place the page lists palette names.
+function setPalNameLocal(id, name) {
+  if (!I || !I.umpalnames) return;
+  I.umpalnames[255 - id] = 'Candle: ' + name;
+  const row = $('pal-candle').querySelector('.palrow[data-id="' + id + '"] .pal'); if (row) row.firstChild.textContent = name;
+  $('pal-all').dataset.k = ''; $('pat-slots').dataset.k = '';
+  renderPalettes(); renderPattern(); renderStrings();
+}
+
+// ---- Palette editor (Candle palettes, saved in the controller's settings) ----
+// Refresh /json/info (palette names), e.g. after adding a palette: the firmware registers it in its main loop.
+async function refreshInfo() { try { I = await getJSON('/json/info'); } catch (e) {} }
+async function newPalette() {
+  if (cfgLocked) { toast('Settings are locked: enter the PIN in WLED settings first'); return; }
+  if (!candleCfg) { await loadCandleCfg(); if (!candleCfg) { toast('Can\u2019t read the palettes; try again'); return; } }
+  let id = 0;
+  for (let k = 245; k >= 226 && !id; k--) { const v = candleCfg['pal' + k]; if (v === undefined || v === '-') id = k; }
+  if (!id) { toast('All 20 of your palette spaces are used: delete one first'); return; }
+  const g = targets()[0], from = g && candlePal(g.pal) ? g.pal : 255, src = candlePal(from) || candlePal(255);
+  const taken = new Set(); for (let k = 0; k < umCount(); k++) taken.add(umName(255 - k).toLowerCase());
+  let name = ''; for (let k = 1; !name || taken.has(name.toLowerCase()); k++) name = 'My palette ' + k;
+  toast('Making ' + name + '\u2026');
+  const text = palText(src);
+  if (!await postCfg({['pal' + id]: text, ['name' + id]: name})) { toast('Not made: no answer from the controller'); return; }
+  let ok = false;   // the firmware adds it in its main loop; wait until WLED lists it
+  for (let i = 0; i < 12 && !ok; i++) { await sleep(250); await refreshInfo(); ok = umName(id) === name; }
+  if (!ok) { toast('Made, but the controller hasn\u2019t listed it yet; reload the page'); return; }
+  candleCfg['pal' + id] = text; candleCfg['name' + id] = name;
+  busy.pal = Date.now(); send(segUpdate({pal: id}));   // show it on the selected strings while it's edited
+  palEdit = {id, stops: toEditable(src.stops), boost: src.boost};
+  renderPalettes(); renderPattern();
+  const row = $('pal-candle').querySelector('.palrow[data-id="' + id + '"]'); if (row) row.scrollIntoView({block: 'center'});
+  toast(name + ': a copy of ' + (umName(from) || 'Classic') + '. Change its colours and name below.');
+}
+async function deletePalette(id) {
+  const name = umName(id);
+  const users = Object.keys(presets).filter(k => (presets[k].seg || []).some(x => x && x.pal === id)).map(k => presets[k].n);
+  if (!confirm('Delete the palette \u201C' + name + '\u201D?' + (users.length ? ' These looks use it and will show grey until you pick another palette: ' + users.join(', ') + '.' : ''))) return;
+  clearTimeout(cfgTimer);
+  if (!await postCfg({['pal' + id]: '-'})) { toast('Not deleted: no answer from the controller'); return; }
+  if (candleCfg) candleCfg['pal' + id] = '-';
+  palEdit = null;
+  await sleep(200); await refreshInfo();
+  renderPalettes(); renderPattern();
+  toast('Deleted ' + name);
+}
+// Save what's showing as a new library look; resolves to its number, or 0 if it didn't save.
+async function saveToLibrary(name) {
+  try {
+    // Pick the number from the controller's current list, not our copy: a save a moment ago may not be in it yet
+    // (2026-11-07: two quick saves both went to #11).
+    let pj = null;
+    for (let i = 0; i < 6 && !pj; i++) { pj = await readPresets(); if (!pj) await sleep(200); }
+    if (!pj) return 0;
+    const id = nextFreeSlot(pj);
+    if (!id) { toast('The library is full'); return 0; }
+    if (!await postState({psave: id, n: name, ib: false, sb: true})) throw new Error('no answer');
+    for (let i = 0; i < 20; i++) {   // WLED saves in its main loop; wait until it's in presets.json
+      await sleep(250);
+      const j = await readPresets();
+      if (j && j[id] && j[id].n === name) { setCurLook(id); await reloadPresets(); return id; }
+    }
+  } catch (e) {}
+  loadPresets();
+  return 0;
+}
+// Ask for a library name (suggested from `hint`); null if cancelled or refused.
+function askLookName(question, hint) {
+  let name = prompt(question, hint);
+  if (name === null) return null;
+  name = cleanName(name).trim();
+  if (!name) { toast('The look needs a name'); return null; }
+  if (isSlotName(name)) { toast(name + ' is a slot\u2019s name; try \u201C' + name + ' look\u201D'); return null; }
+  const dup = Object.keys(presets).find(k => !isSlot(+k) && presets[k].n.toLowerCase() === name.toLowerCase());
+  if (dup && !confirm('Your library already has \u201C' + presets[dup].n + '\u201D (#' + dup + '). Save another look with the same name?')) return null;
+  if (!confirmLookSave(name)) return null;
+  return name;
+}
+function openPalEdit(id) {
+  if (palEdit && palEdit.id === id) { palEdit = null; renderPalettes(); return; }
+  if (cfgLocked) { toast('Settings are locked: enter the PIN in WLED settings first'); return; }
+  const cp = candlePal(id);
+  if (!cp) { toast('Loading palettes\u2026'); loadCandleCfg(); return; }
+  palEdit = {id, stops: toEditable(cp.stops), boost: cp.boost};
+  renderPalettes();
+}
+function renderPalEdit() {
+  const old = $('pal-edit');
+  if (old && palEdit && old.contains(document.activeElement)) return;   // don't rebuild under the user's finger
+  if (old) old.remove();
+  if (!palEdit) return;
+  const row = $('pal-candle').querySelector('.palrow[data-id="' + palEdit.id + '"]'); if (!row) return;
+  const g = targets()[0], useW = !!(g && g.o3);
+  const pe = document.createElement('div'); pe.className = 'pe'; pe.id = 'pal-edit';
+  pe.innerHTML = '<div class="pname"><label>Name</label><input type="text" maxlength="20" autocomplete="off" spellcheck="false"></div><div class="pbar"></div><div class="cap"><span>Low flame</span><span>Tall flame</span></div><div class="stops"></div>' +
+    '<div class="row" style="margin-top:6px"><label>White LED boost<small>Extra white on top of the colour</small></label><input type="range" min="100" max="150" class="boost"><span class="val bv"></span></div>' +
+    '<div class="acts"><button class="ctl small add">+ Colour</button><span class="grow pst" id="pe-status"></span><button class="ctl small reset"></button><button class="ctl small on done">Done</button></div>';
+  const bar = pe.querySelector('.pbar');
+  const paint = () => { bar.style.background = stopsCss(toSaved(palEdit.stops), palEdit.boost, useW);
+    const b = row.querySelector('.bar'); if (b) b.style.background = bar.style.background; };
+  const list = pe.querySelector('.stops');
+  const hex = s => '#' + s.slice(1).map(v => v.toString(16).padStart(2, '0')).join('');
+  const changed = () => { paint(); savePalEdit(); };
+  const build = () => {
+    list.innerHTML = '';
+    palEdit.stops.forEach((st, i) => {
+
+      const r = document.createElement('div'); r.className = 'stop';
+      r.innerHTML = '<input type="color"><input type="range" min="0" max="255"><span class="pos"></span><button class="ctl small">&times;</button>';
+      const [c, pos, pv, del] = r.children;
+      c.value = hex(st); pos.value = st[0]; pv.textContent = Math.round(st[0] / 2.55) + '%';
+      del.disabled = palEdit.stops.length <= 2; del.title = 'Remove this colour';
+      c.oninput = () => { const v = parseInt(c.value.slice(1), 16); st[1] = v >> 16; st[2] = (v >> 8) & 255; st[3] = v & 255; changed(); };
+      pos.oninput = () => {   // keep stops in order: clamp between neighbours
+        const lo = i > 0 ? palEdit.stops[i - 1][0] + 1 : 0, hi = i < palEdit.stops.length - 1 ? palEdit.stops[i + 1][0] - 1 : 255;
+        st[0] = Math.max(lo, Math.min(hi, +pos.value)); pos.value = st[0]; pv.textContent = Math.round(st[0] / 2.55) + '%'; changed(); };
+      del.onclick = () => { palEdit.stops.splice(i, 1); build(); changed(); };
+      list.appendChild(r);
+    });
+    pe.querySelector('.add').disabled = toSaved(palEdit.stops.concat([[128, 0, 0, 0]]).sort((a, b) => a[0] - b[0])).length > 8;
+  };
+  const nm = pe.querySelector('.pname input'), cur = umName(palEdit.id);
+  nm.value = cur;
+  nm.oninput = () => { const v = nm.value.replace(/[^A-Za-z0-9 _.()+-]/g, '').replace(/^ +/, ''); if (v !== nm.value) nm.value = v; };
+  nm.onkeydown = e => { if (e.key === 'Enter') nm.blur(); if (e.key === 'Escape') { nm.value = cur; nm.blur(); } };
+  nm.onblur = async () => {
+    const v = nm.value.trim(), id = palEdit && palEdit.id;
+    if (!v || v === cur || id === undefined) { nm.value = cur; return; }
+    setSaveState('saving');
+    const ok = await postCfg({['name' + id]: v});
+    setSaveState(ok ? 'saved' : 'failed');
+    if (ok) setPalNameLocal(id, v); else nm.value = cur;
+  };
+  build(); paint(); setSaveState(saveState === 'saving' ? 'saving' : saveState);
+  const bo = pe.querySelector('.boost'), bv = pe.querySelector('.bv');
+  bo.value = palEdit.boost; bv.textContent = palEdit.boost + '%';
+  bo.oninput = () => { palEdit.boost = +bo.value; bv.textContent = palEdit.boost + '%'; changed(); };
+  pe.querySelector('.add').onclick = () => {   // new colour in the middle of the widest gap
+    let gi = 0, gw = 0;
+    for (let i = 0; i < palEdit.stops.length - 1; i++) { const w = palEdit.stops[i + 1][0] - palEdit.stops[i][0]; if (w > gw) { gw = w; gi = i; } }
+    if (gw < 2) return;
+    const a = palEdit.stops[gi], b = palEdit.stops[gi + 1];
+    palEdit.stops.splice(gi + 1, 0, [Math.round((a[0] + b[0]) / 2), ...[1, 2, 3].map(k => Math.round((a[k] + b[k]) / 2))]);
+    build(); changed();
+  };
+  const rb = pe.querySelector('.reset');
+  rb.textContent = isUserPal(palEdit.id) ? 'Delete palette' : 'Reset to original';
+  rb.onclick = () => {
+    if (isUserPal(palEdit.id)) { deletePalette(palEdit.id); return; }
+    if (!confirm('Put this palette back to its original colours?')) return;
+    const id = palEdit.id; clearTimeout(cfgTimer);
+    postCfg({['pal' + id]: 'default', ['name' + id]: 'default'}).then(ok => { if (!ok) { toast('Reset not saved \u2014 try again'); return; } setTimeout(async () => { await loadCandleCfg(); const cp = candlePal(id);
+      if (cp && palEdit && palEdit.id === id) { palEdit = {id, stops: toEditable(cp.stops), boost: cp.boost}; renderPalettes(); } const dn = candleCfg && candleCfg['name' + id]; if (dn) setPalNameLocal(id, dn); toast('Palette reset'); }, 300); });
+  };
+  pe.querySelector('.done').onclick = () => { palEdit = null; renderPalettes(); };
+  row.after(pe);
+  setSaveState(saveState);   // the status element only exists once the editor is in the page
+}
+
+
+// ---- Patterns: alternating palettes along a string (interleaved segments, spacing N-1, shifted by Start) ----
+const QUICK = {halloween: [252, 251, 250], christmas: [249, 248, 247]};
+function patRows() { const rows = stringsOf(); return patStr === 'all' ? rows : rows.filter((r, i) => i === patStr); }
+function rowPals(r) {   // the row's palettes in start order (its pattern)
+  return r.segs.map(id => S.seg.find(x => x.id === id)).sort((a, b) => a.start - b.start).map(x => x.pal);
+}
+function applyPattern(pals) {
+  const rows = patRows(); if (!rows.length) return;
+  const used = new Set(S.seg.map(x => x.id)), maxSeg = (I && I.leds && I.leds.maxseg) || 32;
+  const upd = [];
+  for (const r of rows) {
+    const mine = r.segs.slice().sort((a, b) => a - b);
+    const tpl = S.seg.find(x => x.id === mine[0]);
+    const keep = {fx: flameFx >= 0 ? flameFx : tpl.fx, sx: tpl.sx, ix: tpl.ix, c1: tpl.c1, c2: tpl.c2, c3: tpl.c3, o1: tpl.o1, o2: tpl.o2, o3: tpl.o3, bri: tpl.bri, on: tpl.on};
+    const n = pals.length, ids = mine.slice(0, n);
+    for (let id = 0; ids.length < n && id < maxSeg; id++) if (!used.has(id)) { ids.push(id); used.add(id); }
+    if (ids.length < n) { toast('Not enough segments for that pattern'); return; }
+    ids.forEach((id, j) => upd.push(Object.assign({id, start: r.start + j, stop: r.stop, grp: 1, spc: n - 1, of: 0, pal: pals[j]}, keep)));
+    for (const id of mine.slice(n)) upd.push({id, stop: 0});
+  }
+  send({seg: upd});
+}
+function renderPattern() {
+  const rows = stringsOf();
+  const sk = rows.map((r, i) => i).join(',') + '|' + patStr;
+  const ps = $('pat-strings');
+  if (patStr !== 'all' && patStr >= rows.length) patStr = 'all';
+  if (ps.dataset.k !== sk) {
+    ps.dataset.k = sk; ps.innerHTML = '';
+    const opts = [{v: 'all', l: rows.length > 1 ? 'All strings' : 'String A'}].concat(rows.length > 1 ? rows.map((r, i) => ({v: i, l: 'String ' + String.fromCharCode(65 + i)})) : []);
+    for (const o of opts) { const b = document.createElement('button'); b.className = 'ctl' + (o.v === patStr ? ' on' : ''); b.textContent = o.l;
+      b.onclick = () => { patStr = o.v; renderPattern(); }; ps.appendChild(b); }
+  }
+  const sel = patRows(); if (!sel.length) return;
+  const pals = rowPals(sel[0]);
+  const same = sel.every(r => JSON.stringify(rowPals(r)) === JSON.stringify(pals));
+  for (const b of $('pat-quick').children) {
+    const q = b.dataset.q, want = q === 'single' ? null : QUICK[q];
+    b.classList.toggle('on', same && (want ? JSON.stringify(pals) === JSON.stringify(want) : pals.length === 1));
+  }
+  const el = $('pat-slots'), g = S.seg.find(x => x.id === sel[0].segs[0]);
+  const key = JSON.stringify(pals) + same + palNames.length + (I && I.umpalnames ? I.umpalnames.join('|') : '');
+  if (el.dataset.k !== key || !el.children.length) {
+    el.dataset.k = key; el.innerHTML = '';
+    if (!same) { el.innerHTML = '<div class="empty">The selected strings have different patterns. Pick one to make them match.</div>'; }
+    else pals.forEach((pid, j) => {
+      const d = document.createElement('div'); d.className = 'slot';
+      d.innerHTML = '<span class="sn">Colour ' + (j + 1) + '</span><span class="bar"></span><select></select>';
+      const s2 = d.querySelector('select');
+      const add = (id, name) => { const o = document.createElement('option'); o.value = id; o.textContent = name; s2.appendChild(o); };
+      for (let k = 0; k < umCount(); k++) if (umUsed(255 - k) || 255 - k === pid) add(255 - k, umName(255 - k));
+      for (let k = 0; k < ((I && I.cpalcount) || 0); k++) add(200 - k, 'Custom ' + (k + 1));
+      palNames.forEach((nm, id) => add(id, nm));
+      s2.value = pid;
+      s2.onchange = () => { const np = pals.slice(); np[j] = +s2.value; applyPattern(np); };
+      d.querySelector('.bar').style.background = gradCss(pid, g) || '#333';
+      el.appendChild(d);
+    });
+  }
+  $('pat-less').disabled = !same || pals.length <= 1;
+  $('pat-more').disabled = !same || pals.length >= 4;
+}
+
+function renderStrings() {
+  const el = $('segcards');
+  const key = S.seg.map(g => g.id).join(',');
+  if (el.dataset.k !== key) {
+    el.dataset.k = key; el.innerHTML = '';
+    S.seg.forEach((g, i) => {
+      const c = document.createElement('div'); c.className = 'card';
+      c.innerHTML = '<h3><span class="t"></span><button class="ctl small right">On</button></h3>' +
+        '<div class="row"><label>Brightness<small>This string only</small></label><input type="range" min="0" max="255"><span class="val"></span></div>' +
+        '<div class="kv"></div>';
+      const btn = c.querySelector('button'), rng = c.querySelector('input');
+      btn.onclick = () => { const v = !btn.classList.contains('on'); btn.classList.toggle('on', v); busy['so' + g.id] = Date.now(); send({seg: [{id: g.id, on: v}]}); };
+      rng.oninput = () => { busy['sb' + g.id] = Date.now(); c.querySelector('.val').textContent = Math.round(rng.value / 2.55) + '%'; sendThrottled('sb' + g.id, {seg: [{id: g.id, bri: +rng.value}]}); };
+      el.appendChild(c);
+    });
+  }
+  S.seg.forEach((g, i) => {
+    const c = el.children[i]; if (!c) return;
+    c.querySelector('.t').textContent = segName(g, i);
+    const btn = c.querySelector('button'), rng = c.querySelector('input');
+    if (!isBusy('so' + g.id)) { btn.classList.toggle('on', !!g.on); btn.textContent = g.on ? 'On' : 'Off'; }
+    if (!isBusy('sb' + g.id)) rng.value = g.bri;
+    c.querySelector('.val').textContent = Math.round(rng.value / 2.55) + '%';
+    kv(c.querySelector('.kv'), [
+      ['Pixels', g.spc ? 'every ' + ord(g.grp + g.spc) + ' from ' + g.start + ' (' + g.len + ')'
+                       : g.start + '–' + (g.stop - 1) + '  (' + (g.stop - g.start) + ')'],
+      ['Effect', effects[g.fx] || g.fx],
+      ['Palette', palName(g.pal)],
+    ]);
+  });
+  if (!I) return;
+  const rows = [
+    ['Estimated current', I.leds.pwr + ' mA' + (I.leds.maxpwr ? ' of ' + I.leds.maxpwr : '')],
+    ['Frame rate', I.leds.fps + ' fps'],
+    ['LEDs', I.leds.count],
+    ['Wi-Fi signal', I.wifi ? I.wifi.signal + '%' : '—'],
+    ['Address', I.ip || HOST],
+    ['Up for', dur(I.uptime)],
+    ['Firmware', 'WLED ' + I.ver + (I.release ? ' · ' + I.release : '')],
+  ];
+  if (I.u) for (const k in I.u) { if (k.indexOf('<') === 0) continue; const v = I.u[k]; rows.push([k, Array.isArray(v) ? v.join('') : v]); }
+  kv($('kv-info'), rows);
+}
+function ord(n) { return n === 2 ? '2nd' : n === 3 ? '3rd' : n + 'th'; }
+function kv(el, rows) {
+  el.innerHTML = '';
+  for (const [k, v] of rows) {
+    const a = document.createElement('span'); a.className = 'k'; a.textContent = k;
+    const b = document.createElement('span'); b.className = 'v'; b.textContent = v;
+    el.append(a, b);
+  }
+}
+function dur(s) { s = s | 0; const d = (s / 86400) | 0, h = ((s % 86400) / 3600) | 0, m = ((s % 3600) / 60) | 0; return (d ? d + 'd ' : '') + (h ? h + 'h ' : '') + m + 'm'; }
+let toastT = 0;
+function toast(t) { const e = $('toast'); e.textContent = t; e.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => e.classList.remove('show'), 2200); }
+
+// ---- Controls --------------------------------------------------------------
+function showTab(name) {
+  for (const x of $('tabs').children) x.classList.toggle('on', x.dataset.p === name);
+  for (const p of document.querySelectorAll('.pane')) p.classList.toggle('on', p.id === 'p-' + name);
+  const host = document.querySelector('#p-' + name + ' .livehost');   // one live view, shown on HomeKit and Looks
+  if (host && !host.contains($('live'))) host.appendChild($('live'));
+  $('main').scrollTop = 0;
+  updateLive();
+}
+$('tabs').onclick = e => { const b = e.target.closest('button'); if (b) showTab(b.dataset.p); };
+$('power').onclick = () => { if (S) { S.on = !S.on; render(); } send({on: 't'}); };
+$('bri').oninput = () => {
+  busy.bri = Date.now(); $('bri-v').textContent = Math.round($('bri').value / 2.55) + '%';
+  sendThrottled('bri', {bri: +$('bri').value});
+};
+$('edit-slots').onclick = () => { slotEditing = !slotEditing; renderSlots(); };
+$('pal-new').onclick = newPalette;
+$('look-new').onclick = newLook;
+$('lk-save').onclick = saveOpenLook;
+$('lk-undo').onclick = () => { const r = curRow(); if (r && r.kind !== 'now') send({ps: r.id}); };
+$('lk-name').onkeydown = e => { if (e.key === 'Enter') $('lk-name').blur(); if (e.key === 'Escape') { const r = curRow(); $('lk-name').value = r ? r.base : ''; $('lk-name').blur(); } };
+$('lk-name').oninput = () => { const e = $('lk-name'), v = cleanName(e.value); if (v !== e.value) e.value = v; };
+$('lk-name').onblur = () => { const r = curRow(), v = $('lk-name').value.trim(); if (r && r.kind !== 'now' && v && v !== r.base) renameOpenLook(v); else if (r && r.kind !== 'now') $('lk-name').value = r.base; };
+$('mode-off').onclick = () => send({seg: S.seg.filter(x => x.o1 || x.o2).map(x => ({id: x.id, o1: false, o2: false}))});
+$('pat-quick').onclick = e => {
+  const b = e.target.closest('button'); if (!b || !S) return;
+  const q = b.dataset.q, cur = patRows()[0];
+  applyPattern(q === 'single' ? [cur ? rowPals(cur)[0] : 255] : QUICK[q]);
+};
+$('pat-more').onclick = () => { const r = patRows()[0]; if (!r) return; const p = rowPals(r); const extra = [252, 251, 250, 249].find(x => !p.includes(x)) || 255; applyPattern(p.concat([extra]).slice(0, 4)); };
+$('pat-less').onclick = () => { const r = patRows()[0]; if (!r) return; const p = rowPals(r); if (p.length > 1) applyPattern(p.slice(0, -1)); };
+$('fx-use').onclick = () => { if (flameFx >= 0) send(segUpdate({fx: flameFx, fxdef: true})); };
+$('fx-reset').onclick = () => { if (flameFx >= 0 && confirm('Reset the flame sliders to their defaults?')) send(segUpdate({fx: flameFx, fxdef: true})); };
+if (BASE) for (const a of document.querySelectorAll('.links a, #lnk-cpal, #lnk-wled')) a.href = BASE + a.getAttribute('href');
+
+setLink(false);
+connect();
+loadStatic();
+loadPresets();
+loadCandleCfg();
+</script>
+</body>
+</html>

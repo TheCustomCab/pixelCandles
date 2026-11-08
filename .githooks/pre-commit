@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# Runs the leak guard on staged files. Install once per clone: git config core.hooksPath .githooks
+exec "$(git rev-parse --show-toplevel)/scripts/leak-guard.sh"

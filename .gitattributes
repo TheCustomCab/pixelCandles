@@ -1,0 +1,16 @@
+# Normalize line endings: text files are stored with LF and checked out with LF on every platform
+# (shell scripts and git hooks must keep LF to run, also under Git Bash on Windows).
+* text=auto eol=lf
+*.sh text eol=lf
+.githooks/* text eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+# Binary files
+*.png binary
+*.jpg binary
+*.bin binary
+*.f3d binary
+*.f3z binary
+*.stl binary
+*.3mf binary

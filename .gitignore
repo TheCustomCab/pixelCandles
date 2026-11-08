@@ -1,0 +1,19 @@
+# Build tree and caches
+WLED/
+.pio/
+.DS_Store
+test/traces.csv
+test/sim_test
+
+# Personal / site-specific files: never commit (see site.example.md and scripts/leak-guard.sh)
+site.local.md
+*.local.*
+*.local
+Backups/
+backups/
+*.bin
+*.elf
+stock*.bin
+wsec.json
+.env
+.env.*

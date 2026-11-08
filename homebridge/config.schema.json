@@ -1,0 +1,188 @@
+{
+  "pluginAlias": "WledCandles",
+  "pluginType": "platform",
+  "singular": true,
+  "headerDisplay": "HomeKit control for WLED candles running the candle_flame usermod: one Candles accessory with a dimmable light, a fade-in, and the look slots (presets 1-5) as switches in the same tile.",
+  "footerDisplay": "Give the controller a fixed address (a DHCP reservation in your router).",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "title": "Name",
+        "type": "string",
+        "default": "Candles",
+        "required": true
+      },
+      "host": {
+        "title": "Controller address",
+        "description": "IP address or hostname of the WLED controller, e.g. 192.0.2.10 or wled-controller.local.",
+        "type": "string",
+        "required": true,
+        "format": "hostname"
+      },
+      "port": {
+        "title": "Port",
+        "type": "integer",
+        "default": 80,
+        "minimum": 1,
+        "maximum": 65535
+      },
+      "fadeInSeconds": {
+        "title": "Fade-in (seconds)",
+        "description": "How long the candles take to come up when turned on. WLED allows at most 65 s.",
+        "type": "number",
+        "default": 10,
+        "minimum": 0,
+        "maximum": 65
+      },
+      "fadeOutSeconds": {
+        "title": "Fade-out (seconds)",
+        "type": "number",
+        "default": 5,
+        "minimum": 0,
+        "maximum": 65
+      },
+      "brightnessTransitionSeconds": {
+        "title": "Brightness change transition (seconds)",
+        "type": "number",
+        "default": 0.5,
+        "minimum": 0,
+        "maximum": 65
+      },
+      "slotTurnsOn": {
+        "title": "Choosing a look also turns the candles on",
+        "type": "boolean",
+        "default": true
+      },
+      "slots": {
+        "title": "Look slots (preset numbers)",
+        "description": "Presets shown as switches. Normally the five slots, 1-5.",
+        "type": "array",
+        "default": [
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "items": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 250
+        }
+      },
+      "pollSeconds": {
+        "title": "Polling interval while the live connection is down (seconds)",
+        "type": "integer",
+        "default": 10,
+        "minimum": 2,
+        "maximum": 300
+      },
+      "offlineGraceSeconds": {
+        "title": "Show No Response after the controller has been unreachable for (seconds)",
+        "type": "integer",
+        "default": 30,
+        "minimum": 5,
+        "maximum": 600
+      },
+      "offlineSensor": {
+        "title": "Add an \"online\" contact sensor",
+        "description": "Closed while the controller responds; usable for Home app notifications.",
+        "type": "boolean",
+        "default": false
+      },
+      "id": {
+        "title": "Accessory ID",
+        "description": "Identifies the accessory in HomeKit. Changing it creates a new accessory (scenes must be rebuilt).",
+        "type": "string",
+        "default": "candles"
+      },
+      "debug": {
+        "title": "Verbose logging",
+        "type": "boolean",
+        "default": false
+      },
+      "lookControl": {
+        "title": "How looks appear in the Home app",
+        "type": "string",
+        "default": "combined",
+        "oneOf": [
+          {
+            "title": "One tile: dimmer + look list (recommended)",
+            "enum": [
+              "combined"
+            ]
+          },
+          {
+            "title": "Look list as a separate tile",
+            "enum": [
+              "picker"
+            ]
+          },
+          {
+            "title": "Switches in the Candles tile (no labels in the tile)",
+            "enum": [
+              "switches"
+            ]
+          },
+          {
+            "title": "Separate look list and switches",
+            "enum": [
+              "both"
+            ]
+          }
+        ]
+      },
+      "pickerName": {
+        "title": "Look list name (separate tile only)",
+        "type": "string",
+        "placeholder": "Candles Looks"
+      },
+      "lookListAlwaysOn": {
+        "title": "Look list usable while the candles are off",
+        "description": "Lets you choose a look while the candles are off (it turns them on), but the Home app then shows the tile as On even while the candles are off. Off: the tile status is accurate; turn the candles on, then choose a look.",
+        "type": "boolean",
+        "default": false
+      }
+    }
+  },
+  "layout": [
+    "name",
+    "host",
+    {
+      "type": "fieldset",
+      "title": "Fades",
+      "expandable": true,
+      "items": [
+        "fadeInSeconds",
+        "fadeOutSeconds",
+        "brightnessTransitionSeconds"
+      ]
+    },
+    {
+      "type": "fieldset",
+      "title": "Looks",
+      "expandable": true,
+      "items": [
+        "lookControl",
+        "lookListAlwaysOn",
+        "pickerName",
+        "slotTurnsOn",
+        "slots"
+      ]
+    },
+    {
+      "type": "fieldset",
+      "title": "Connection",
+      "expandable": true,
+      "items": [
+        "port",
+        "pollSeconds",
+        "offlineGraceSeconds",
+        "offlineSensor",
+        "id",
+        "debug"
+      ]
+    }
+  ]
+}

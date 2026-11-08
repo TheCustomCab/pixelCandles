@@ -1,0 +1,33 @@
+pixelCandles: firmware, control page, HomeKit plugin and documentation
+=====================================================================
+
+Licensing of this repository
+----------------------------
+  firmware/    EUPL-1.2    candle_flame WLED usermod, build overlay, Candles control page, tools and tests
+  homebridge/  MIT         Homebridge plugin
+  scripts/     MIT         repository tooling (leak guard)
+  docs/        CC-BY-4.0   documentation
+  hardware/    CC-BY-4.0   hardware notes
+Each folder has its own LICENSE file. Source files carry SPDX-License-Identifier headers.
+
+Third-party components
+----------------------
+The firmware is built on these projects. They are NOT included in this repository: the build fetches them
+at the pinned versions below.
+
+  WLED                     v16.0.1 (tag v16.0.1, commit 29b389df1c1aaec6ff53aea742d17063b985906c)
+                           https://github.com/wled/WLED                       EUPL-1.2 (or later)
+  wled-usermod-powermanager commit c7d92255a8c5106ac9abb9ab504967a287f36510
+                           https://github.com/intermittech/wled-usermod-powermanager   EUPL-1.2
+                           (also the source of the Dig-Next-2 build environment this repository's
+                           platformio_override.ini is derived from)
+
+A compiled firmware image also contains the libraries, framework and toolchain runtime that WLED v16.0.1
+pins in its platformio.ini (Arduino-ESP32 / ESP-IDF, FastLED, NeoPixelBus, ArduinoJson, AsyncTCP,
+ESPAsyncWebServer and others), each under its own licence; see WLED's repository at that tag.
+
+Firmware binaries
+-----------------
+This repository does not ship firmware binaries. Anyone distributing a binary built from it must include
+firmware/LICENSE, this NOTICE, and a link to the corresponding source (this repository at the matching
+commit, plus the WLED and PowerManager versions above), as the EUPL requires.
