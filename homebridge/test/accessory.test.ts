@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 // HomeKit mapping, tested with Homebridge's own PlatformAccessory and HAP-NodeJS classes against the mock WLED:
 // service layout, names, characteristic reads/writes, radio switches, No Response while offline.
 import { after, before, describe, it } from 'node:test';

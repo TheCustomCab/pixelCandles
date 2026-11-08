@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: EUPL-1.2
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 // Host-side tests for candle_core.h:  g++ -std=c++17 -O2 -I../usermods/candle_flame sim_test.cpp -o sim_test
 // Also writes traces.csv for plotting.
 #include "candle_core.h"

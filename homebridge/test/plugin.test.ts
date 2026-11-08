@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 // Unit tests against a mock WLED controller: connection, reconnection, offline handling, live sync, slot radio
 // behaviour, and merging of scene commands. Run: npm test
 import { after, afterEach, before, describe, it } from 'node:test';

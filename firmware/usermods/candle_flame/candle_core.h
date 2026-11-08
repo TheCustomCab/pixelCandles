@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: EUPL-1.2
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 // candle_core.h - portable candle flame model for the "Candle Flame" WLED effect.
 //
 // No WLED or Arduino dependencies, so the same code runs on the ESP32 and in the

@@ -98,7 +98,7 @@ It does **not** aim for the Homebridge Verified badge (see Appendix A).
 1. **Name** the package with the `homebridge-` prefix (e.g. `homebridge-wled-candles`) and add the `homebridge-plugin` keyword in `package.json`.
 2. **Publish to npm.** Free account; enable two-factor authentication.
 3. **Source on GitHub** with issues enabled. At this point, set a real or GitHub noreply git email (the repo currently uses a placeholder).
-4. **License:** MIT is typical for Homebridge plugins. The plugin is separate from the WLED usermod (which falls under WLED's EUPL licence).
+4. **License:** MIT is typical for Homebridge plugins; this project uses PolyForm Noncommercial 1.0.0 (non-commercial use; commercial licences from the author, see COMMERCIAL.md).
 5. **Install in HOOBS** by searching the package name.
 
 Note: HOOBS has its own certification program, separate from Homebridge Verified. Not investigated.

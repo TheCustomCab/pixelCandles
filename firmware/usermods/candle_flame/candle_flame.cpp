@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: EUPL-1.2
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 // candle_flame.cpp - "Candle Flame" effect + candle/holiday palettes for WLED 16.x
 //
 // Adds one effect and ten named palettes. The flame model itself lives in

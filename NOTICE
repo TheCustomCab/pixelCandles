@@ -3,12 +3,14 @@ pixelCandles: firmware, control page, HomeKit plugin and documentation
 
 Licensing of this repository
 ----------------------------
-  firmware/    EUPL-1.2    candle_flame WLED usermod, build overlay, Candles control page, tools and tests
-  homebridge/  MIT         Homebridge plugin
-  scripts/     MIT         repository tooling (leak guard)
-  docs/        CC-BY-4.0   documentation
-  hardware/    CC-BY-4.0   hardware notes
+  firmware/    PolyForm-Noncommercial-1.0.0   candle_flame WLED usermod, Candles control page, tools and tests
+               (platformio_override.ini: EUPL-1.2, see firmware/LICENSE-EUPL-1.2)
+  homebridge/  PolyForm-Noncommercial-1.0.0   Homebridge plugin
+  scripts/     MIT                            repository tooling (leak guard)
+  docs/        CC-BY-NC-SA-4.0                documentation
+  hardware/    CC-BY-NC-SA-4.0                hardware notes
 Each folder has its own LICENSE file. Source files carry SPDX-License-Identifier headers.
+Non-commercial use only; commercial licences are available from the author (COMMERCIAL.md).
 
 Third-party components
 ----------------------
@@ -28,6 +30,7 @@ ESPAsyncWebServer and others), each under its own licence; see WLED's repository
 
 Firmware binaries
 -----------------
-This repository does not ship firmware binaries. Anyone distributing a binary built from it must include
-firmware/LICENSE, this NOTICE, and a link to the corresponding source (this repository at the matching
-commit, plus the WLED and PowerManager versions above), as the EUPL requires.
+This repository does not ship firmware binaries. Build the firmware yourself for your own non-commercial use.
+A compiled image combines this repository's code with WLED (EUPL-1.2), whose licence governs how such an image may
+be distributed; the non-commercial licence of this repository does not permit distributing images. Ask the author
+(COMMERCIAL.md) about any other use.

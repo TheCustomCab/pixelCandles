@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: EUPL-1.2
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 // palette_flicker.cpp - score how busy each palette looks under the real flame model.
 //
 // Build (from firmware/):  g++ -std=c++17 -O2 -Iusermods/candle_flame tools/palette_flicker.cpp -o palette_flicker

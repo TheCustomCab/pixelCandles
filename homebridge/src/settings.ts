@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 import type { PlatformConfig } from 'homebridge';
 import { MAX_TRANSITION_S } from './candles/controller.js';
 

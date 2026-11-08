@@ -38,4 +38,4 @@ The PowerManager usermod can switch the board's power outputs per segment. With 
 on, outputs that aren't linked to a segment stay unpowered, so the strings stay dark even though WLED is running.
 Link each output to its segment before turning take-over on.
 
-Licence: CC BY 4.0 (see [LICENSE](LICENSE)).
+Licence: CC BY-NC-SA 4.0 (see [LICENSE](LICENSE)); commercial use: [COMMERCIAL.md](../COMMERCIAL.md).

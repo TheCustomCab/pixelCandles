@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 // A small stand-in for a WLED controller: the JSON API and the live-state WebSocket, with switches for
 // simulating reboots, dead sockets and changes made by other clients.
 

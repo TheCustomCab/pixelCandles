@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 // Maps the candles controller onto HomeKit: a primary Lightbulb plus one Switch per look slot, linked so the Home
 // app shows them in one tile. Service subtypes are stable ('candles', 'slot-<n>', 'online'); names shown in the
 // Home app come from ConfiguredName, so renaming a slot never changes a service's identity.

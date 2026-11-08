@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 // Look picker: the slots as a named input list. HomeKit only offers a named picker on a Television service. By default
 // (lookControl "combined") the Television service sits on the Candles accessory itself, so the Home app shows one tile
 // with the brightness slider, a power button and the look list; with "picker" it is its own TV-type accessory.

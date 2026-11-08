@@ -5,7 +5,7 @@
   "description": "HomeKit control for WLED candles: one tile with a dimmable light, gentle fades and a named list of looks (WLED presets).",
   "type": "module",
   "main": "dist/index.js",
-  "license": "MIT",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "author": "TheCustomCab",
   "repository": {
     "type": "git",

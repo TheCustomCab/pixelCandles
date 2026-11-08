@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 // Run a separate, local Homebridge for testing this plugin: its own storage folder (.homebridge-test, gitignored),
 // port and bridge name, so it never touches another Homebridge on the network. Nothing is installed globally.
 //

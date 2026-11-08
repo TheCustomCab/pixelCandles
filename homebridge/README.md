@@ -97,4 +97,5 @@ Release steps: [docs/homebridge-release.md](https://github.com/TheCustomCab/pixe
 
 ## Licence
 
-MIT, see [LICENSE](LICENSE).
+PolyForm Noncommercial 1.0.0, see [LICENSE](LICENSE): free for personal and other non-commercial use.
+Commercial use needs a licence from the author: see [COMMERCIAL.md](https://github.com/TheCustomCab/pixelCandles/blob/main/COMMERCIAL.md).

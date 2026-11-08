@@ -12,13 +12,18 @@ WLED release.
 
 | Folder | What it is | Licence |
 |---|---|---|
-| [`firmware/`](firmware/README.md) | `candle_flame` WLED usermod (Candle Flame effect, palettes, HomeKit slots), build overlay, the Candles control page, tools and host tests | EUPL-1.2 |
-| [`homebridge/`](homebridge/README.md) | Homebridge plugin for HomeKit | MIT |
-| [`hardware/`](hardware/README.md) | Controller notes (QuinLED Dig-Next-2) | CC BY 4.0 |
-| [`docs/`](docs/) | Setup guide, design notes, HomeKit research and plugin plan | CC BY 4.0 |
+| [`firmware/`](firmware/README.md) | `candle_flame` WLED usermod (Candle Flame effect, palettes, HomeKit slots), build overlay, the Candles control page, tools and host tests | PolyForm Noncommercial 1.0.0 |
+| [`homebridge/`](homebridge/README.md) | Homebridge plugin for HomeKit | PolyForm Noncommercial 1.0.0 |
+| [`hardware/`](hardware/README.md) | Controller notes (QuinLED Dig-Next-2) | CC BY-NC-SA 4.0 |
+| [`docs/`](docs/) | Setup guide, design notes, HomeKit research and plugin plan | CC BY-NC-SA 4.0 |
 | `scripts/` | Repository tooling (see [CONTRIBUTING.md](CONTRIBUTING.md)) | MIT |
 
-Third-party components and their licences: [NOTICE](NOTICE).
+## Licence
+
+pixelCandles is **source-available for non-commercial use**: personal, hobby, study, research and charity use, and
+forks on the same terms. **Commercial use needs a licence from the author**: see [COMMERCIAL.md](COMMERCIAL.md).
+Each folder's LICENSE file has the exact terms. Third-party components (WLED and others) keep their own licences:
+[NOTICE](NOTICE).
 
 ## Getting started
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# SPDX-License-Identifier: EUPL-1.2
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Make WLED's built-in web UI servable at /wled.htm (the Candles page owns /), with a way back.
 
 The Candles page is uploaded as /index.htm, which replaces WLED's built-in UI at /. To keep WLED's own UI

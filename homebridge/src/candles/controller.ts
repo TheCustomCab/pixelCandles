@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 // Candle behaviour, independent of HomeKit: the light (on/off, brightness, fade-in), the look slots with radio
 // behaviour, offline handling, and merging of commands that arrive together (a Home app scene sends On,
 // Brightness and a slot switch within milliseconds; sending them separately would cut the fade-in short).
